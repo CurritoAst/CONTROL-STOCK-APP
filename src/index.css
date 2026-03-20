@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg-primary text-text-primary antialiased min-h-screen flex flex-col;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Force dark background and prevent white flashes */
+    background-color: #09090b;
+  }
+
+  #root {
+    @apply flex flex-col min-h-screen w-full;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold leading-tight mb-3 text-text-primary;
+  }
+
+  p {
+    @apply text-text-secondary mb-4;
+  }
+
+  input,
+  select,
+  textarea {
+    @apply w-full px-4 py-3 bg-bg-primary/50 border border-white/10 rounded-xl text-text-primary font-sans text-base transition-all duration-200;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    @apply outline-none border-accent-blue/50 ring-4 ring-accent-blue/10 bg-bg-primary/80;
+  }
+
+  label {
+    @apply text-sm font-semibold text-text-muted mb-2 block ml-1;
+  }
+}
+
+@layer components {
+  /* Premium Glass Card System */
+  .card {
+    background: linear-gradient(135deg, rgba(24, 24, 27, 0.7) 0%, rgba(18, 18, 21, 0.8) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    @apply rounded-2xl p-6 transition-all duration-300;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  }
+
+  .card:hover {
+    @apply -translate-y-[2px];
+    background: linear-gradient(135deg, rgba(30, 30, 35, 0.8) 0%, rgba(20, 20, 25, 0.9) 100%);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Core Buttons with Glossy effect */
+  .btn {
+    @apply inline-flex items-center justify-center px-6 py-3 text-sm font-bold rounded-xl border-none cursor-pointer transition-all duration-300 gap-2 no-underline active:scale-[0.97] uppercase tracking-wide;
+  }
+
+  .btn-primary {
+    @apply bg-accent-blue text-white shadow-lg shadow-accent-blue/20 hover:bg-accent-blue-hover hover:shadow-accent-blue/40;
+  }
+
+  .btn-success {
+    @apply bg-accent-green text-white shadow-lg shadow-accent-green/10 hover:bg-accent-green-hover;
+  }
+
+  .btn-danger {
+    @apply bg-accent-red text-white hover:bg-accent-red-hover;
+  }
+
+  .btn-outline {
+    @apply bg-white/5 text-text-primary border border-white/10 hover:bg-white/10 hover:border-white/20;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-widest;
+  }
+
+  .badge-blue { @apply bg-accent-blue/20 text-accent-blue border border-accent-blue/30; }
+  .badge-green { @apply bg-accent-green/20 text-accent-green border border-accent-green/30; }
+  .badge-red { @apply bg-accent-red/20 text-accent-red border border-accent-red/30; }
+  .badge-gray { @apply bg-white/10 text-text-muted border border-white/10; }
+
+  /* Input Group wrapper */
+  .input-group {
+    @apply flex flex-col gap-1 mb-5;
+  }
+}
+
+/* Premium Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Remove all light mode overrides */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: dark;
+  }
+}
