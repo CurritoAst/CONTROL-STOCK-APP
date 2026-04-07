@@ -185,15 +185,6 @@ export const sendViaGmail = (html: string, filename: string): Promise<void> =>
         const sendWithToken = async (token: string) => {
             try {
                 const pdfBlob = await htmlToPdf(html);
-                // Descarga local del PDF (en móvil puede no funcionar, pero no falla)
-                try {
-                    const url = URL.createObjectURL(pdfBlob);
-                    const a = Object.assign(document.createElement('a'), { href: url, download: pdfFilename });
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    setTimeout(() => URL.revokeObjectURL(url), 10000);
-                } catch (_) { /* descarga local no crítica */ }
                 // Envío por Gmail
                 await doSend(pdfBlob, pdfFilename, token);
                 done();
