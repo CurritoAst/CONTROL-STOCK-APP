@@ -71,6 +71,8 @@ function buildOrderHtml(date: string, eventTitle: string | undefined, items: Arr
   .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; }
 </style></head>
 <body>
+  <!-- Bloque blanco para cubrir los headers que imprime la impresora Brother automáticamente -->
+  <div style="height:115px;background:#ffffff;width:100%;display:block;">&nbsp;</div>
   <div class="header">
     <div>
       <div class="brand">MACARIO<span>.</span></div>
