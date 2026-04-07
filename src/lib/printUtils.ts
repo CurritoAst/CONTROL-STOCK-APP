@@ -43,7 +43,7 @@ export const sendOrderToprinter = async (log: { date: string; eventTitle?: strin
             date: log.date,
             eventTitle: log.eventTitle,
             items: log.items.filter(i => i.prepared > 0).map(i => ({
-                product: { name: i.product.name, category: i.product.category || 'Sin categoría' },
+                product: { name: i.product.name, category: i.product.category || 'Sin categoría', price: i.product.price || 0 },
                 prepared: i.prepared,
             })),
         }),
