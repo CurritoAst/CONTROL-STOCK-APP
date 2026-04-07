@@ -1,7 +1,9 @@
 // Supabase Edge Function: send-print-email
-// Envía el pedido como HTML directamente al email de la impresora Brother
-// usando Gmail SMTP con cuenta de servicio (sin OAuth popup en el cliente)
+// Envía el pedido al email de la impresora Brother vía Gmail SMTP
+// Usa App Password de Gmail (sin OAuth popup) → funciona en todos los dispositivos
 // Deploy: npx supabase functions deploy send-print-email
+
+import { SmtpClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 
 const CORSHEADERS = {
     'Access-Control-Allow-Origin': '*',
@@ -11,8 +13,7 @@ const CORSHEADERS = {
 
 const PRINTER_EMAIL = '11974454020@print.brother.com';
 
-// Construye el HTML del pedido
-function buildOrderHtml(date: string, eventTitle: string | undefined, items: Array<{ product: { name: string; category?: string }; prepared: number }>) {
+function buildOrderHtml(date: string, eventTitle: string | undefined, items: Array<{ product: { name: string; category?: string }; prepared: number }>): string {
     const byCategory: Record<string, typeof items> = {};
     items.filter(i => i.prepared > 0).forEach(item => {
         const cat = item.product.category || 'Sin categoría';
@@ -34,131 +35,41 @@ function buildOrderHtml(date: string, eventTitle: string | undefined, items: Arr
             </table>
         `).join('');
 
-    const styles = `
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #111; font-size: 13px; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #111; padding-bottom: 18px; margin-bottom: 24px; }
-        .brand { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; }
-        .brand span { color: #e05c00; }
-        .meta { text-align: right; }
-        .meta .label { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 700; }
-        .meta .value { font-size: 15px; font-weight: 700; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
-        .info-box { background: #f7f7f7; border-radius: 8px; padding: 12px 16px; }
-        .info-box .lbl { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 700; }
-        .info-box .val { font-size: 15px; font-weight: 700; margin-top: 2px; }
-        .cat-title { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; color: #444; background: #f0f0f0; padding: 6px 12px; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; margin: 10px 0 0; }
-        table { width: 100%; border-collapse: collapse; }
-        .item-row td { padding: 8px 12px; border-bottom: 1px solid #eee; }
-        .item-row:last-child td { border-bottom: none; }
-        .qty { font-size: 20px; font-weight: 900; color: #1d4ed8; text-align: right; width: 60px; }
-        .footer { margin-top: 36px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
-    `;
-
     const totalItems = items.filter(i => i.prepared > 0).length;
     const generatedDate = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
 
     return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <title>Pedido - ${eventTitle || 'General'} - ${date}</title>
-<style>${styles}</style></head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; padding: 40px; color: #111; font-size: 13px; }
+  .header { display: flex; justify-content: space-between; border-bottom: 3px solid #111; padding-bottom: 18px; margin-bottom: 24px; }
+  .brand { font-size: 26px; font-weight: 900; }
+  .brand span { color: #e05c00; }
+  .meta { text-align: right; font-size: 13px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+  .info-box { background: #f7f7f7; border-radius: 8px; padding: 12px 16px; }
+  .info-box .lbl { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 700; }
+  .info-box .val { font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .cat-title { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #444; background: #f0f0f0; padding: 6px 12px; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; margin: 10px 0 0; }
+  table { width: 100%; border-collapse: collapse; }
+  .item-row td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  .qty { font-size: 20px; font-weight: 900; color: #1d4ed8; text-align: right; width: 60px; }
+  .footer { margin-top: 36px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
+</style></head>
 <body>
   <div class="header">
-    <div>
-      <div class="brand">MACARIO<span>.</span></div>
-      <div style="color:#555;margin-top:4px;font-size:13px;">Hoja de Pedido</div>
-    </div>
-    <div class="meta">
-      <div class="label">Fecha del servicio</div>
-      <div class="value">${date}</div>
-    </div>
+    <div><div class="brand">MACARIO<span>.</span></div><div style="color:#555;margin-top:4px;">Hoja de Pedido</div></div>
+    <div class="meta"><strong>Fecha del servicio</strong><br>${date}</div>
   </div>
   <div class="info-grid">
-    <div class="info-box">
-      <div class="lbl">Evento / Pedido</div>
-      <div class="val">${eventTitle || 'Pedido General'}</div>
-    </div>
-    <div class="info-box">
-      <div class="lbl">Total productos</div>
-      <div class="val">${totalItems} referencias</div>
-    </div>
+    <div class="info-box"><div class="lbl">Evento / Pedido</div><div class="val">${eventTitle || 'Pedido General'}</div></div>
+    <div class="info-box"><div class="lbl">Total productos</div><div class="val">${totalItems} referencias</div></div>
   </div>
   ${sections}
   <div class="footer">Generado el ${generatedDate}</div>
 </body></html>`;
-}
-
-// Envía email via Gmail API usando refresh token de la cuenta de servicio
-async function sendViaGmailApi(html: string, subject: string): Promise<void> {
-    const gmailRefreshToken = Deno.env.get('GMAIL_REFRESH_TOKEN');
-    const gmailClientId = Deno.env.get('GMAIL_CLIENT_ID');
-    const gmailClientSecret = Deno.env.get('GMAIL_CLIENT_SECRET');
-    const gmailFromEmail = Deno.env.get('GMAIL_FROM_EMAIL');
-
-    if (!gmailRefreshToken || !gmailClientId || !gmailClientSecret || !gmailFromEmail) {
-        throw new Error('Faltan variables de entorno de Gmail (GMAIL_REFRESH_TOKEN, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_FROM_EMAIL)');
-    }
-
-    // 1. Obtener access token usando refresh token
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            client_id: gmailClientId,
-            client_secret: gmailClientSecret,
-            refresh_token: gmailRefreshToken,
-            grant_type: 'refresh_token',
-        }),
-    });
-
-    if (!tokenRes.ok) {
-        const err = await tokenRes.text();
-        throw new Error(`Error obteniendo access token: ${err}`);
-    }
-
-    const { access_token } = await tokenRes.json();
-
-    // 2. Construir el MIME del email con adjunto HTML
-    const boundary = 'macario_print_boundary_' + Date.now();
-    const htmlB64 = btoa(unescape(encodeURIComponent(html)));
-
-    const mime = [
-        `From: Macario App <${gmailFromEmail}>`,
-        `To: ${PRINTER_EMAIL}`,
-        `Subject: ${subject}`,
-        'MIME-Version: 1.0',
-        `Content-Type: multipart/mixed; boundary="${boundary}"`,
-        '',
-        `--${boundary}`,
-        'Content-Type: text/plain; charset="UTF-8"',
-        '',
-        'Pedido enviado desde Macario App. Ver fichero adjunto para imprimir.',
-        '',
-        `--${boundary}`,
-        `Content-Type: text/html; name="${subject}.html"`,
-        `Content-Disposition: attachment; filename="${subject}.html"`,
-        'Content-Transfer-Encoding: base64',
-        '',
-        htmlB64,
-        `--${boundary}--`,
-    ].join('\r\n');
-
-    // 3. Codificar en base64url y enviar
-    const rawB64 = btoa(mime).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-    const sendRes = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages/send', {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${access_token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ raw: rawB64 }),
-    });
-
-    if (!sendRes.ok) {
-        const err = await sendRes.json();
-        throw new Error(err.error?.message || 'Error al enviar email via Gmail API');
-    }
 }
 
 Deno.serve(async (req: Request) => {
@@ -177,10 +88,34 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ error: 'Faltan datos: date, items requeridos' }), { status: 400, headers: CORSHEADERS });
         }
 
+        const gmailUser = Deno.env.get('GMAIL_FROM_EMAIL');
+        const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD');
+
+        if (!gmailUser || !gmailPass) {
+            throw new Error('Faltan variables de entorno: GMAIL_FROM_EMAIL y GMAIL_APP_PASSWORD');
+        }
+
         const html = buildOrderHtml(date, eventTitle, items);
         const subject = `Pedido-${eventTitle || 'General'}-${date}`;
 
-        await sendViaGmailApi(html, subject);
+        // Conexión SMTP con Gmail
+        const client = new SmtpClient();
+        await client.connectTLS({
+            hostname: 'smtp.gmail.com',
+            port: 465,
+            username: gmailUser,
+            password: gmailPass,
+        });
+
+        await client.send({
+            from: gmailUser,
+            to: PRINTER_EMAIL,
+            subject,
+            content: 'Pedido enviado desde Macario App. Ver fichero adjunto para imprimir.',
+            html,
+        });
+
+        await client.close();
 
         return new Response(JSON.stringify({ success: true, message: 'Email enviado a la impresora' }), {
             status: 200,
