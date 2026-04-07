@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { InventoryItem } from '../../types';
-import { printRawOrder } from '../master/DailyAudit';
+import { printRawOrder } from '../../lib/printUtils';
 
 export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: string, onLogCreated?: () => void }> = ({ selectedDate, eventTitle, onLogCreated }) => {
     const { products, openDailyLog } = useAppContext();
