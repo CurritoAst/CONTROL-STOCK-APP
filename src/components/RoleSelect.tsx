@@ -20,6 +20,9 @@ export const RoleSelect: React.FC = () => {
         } else if (user === 'cocina' && pass === '1234') {
             setRole('EMPLOYEE');
             addToast('Bienvenido al servicio de cocina', 'success');
+        } else if (user === 'saul' && pass === 'GrupoDuke2026') {
+            setRole('VIEWER');
+            addToast('Bienvenido, Saúl', 'success');
         } else {
             addToast('Credenciales incorrectas', 'error');
         }

@@ -1,26 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { useToast } from '../../context/ToastContext';
+import { sendViaGmail } from '../../lib/gmailSend';
 
-const downloadDayInvoice = (day: any, orderTitle: string) => {
-    const rows = day.items.map((item: any) => {
-        const sobrante = Math.max(0, item.prepared - item.consumed);
-        const cost = item.consumed * item.product.price;
-        return `<tr>
-            <td><strong>${item.product.name}</strong></td>
-            <td class="center">${item.prepared}</td>
-            <td class="center">${item.consumed}</td>
-            <td class="center sobrante">${sobrante}</td>
-            <td class="right">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
-            <td class="right bold">${cost.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
-        </tr>`;
-    }).join('');
-
-    const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Factura ${orderTitle} – ${day.date}</title>
-<style>
+const INVOICE_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 48px; color: #111; font-size: 13px; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #111; padding-bottom: 20px; margin-bottom: 28px; }
@@ -37,6 +20,8 @@ const downloadDayInvoice = (day: any, orderTitle: string) => {
   thead th { background: #111; color: #fff; padding: 9px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
   tbody td { padding: 9px 12px; border-bottom: 1px solid #eee; }
   tbody tr:last-child td { border-bottom: none; }
+  .cat-header td { background: #f0f0f0; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: #444; padding: 7px 12px; border-bottom: 1px solid #ddd; }
+  .indent { padding-left: 22px !important; }
   .center { text-align: center; }
   .right { text-align: right; }
   .bold { font-weight: 700; }
@@ -50,20 +35,58 @@ const downloadDayInvoice = (day: any, orderTitle: string) => {
   .total-merma .total-amount { font-size: 28px; font-weight: 900; color: #dc2626; }
   .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 14px; }
   @media print { body { padding: 20px; } @page { margin: 12mm; } }
-</style>
-</head>
+`;
+
+const buildCategoryRows = (items: any[]) => {
+    const byCategory: Record<string, any[]> = {};
+    items.forEach(item => {
+        const cat = item.product.category || 'Sin categoría';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(item);
+    });
+    return Object.entries(byCategory)
+        .sort(([a], [b]) => a.localeCompare(b, 'es'))
+        .map(([cat, catItems]) => {
+            const headerRow = `<tr class="cat-header"><td colspan="6">${cat}</td></tr>`;
+            const itemRows = catItems.map((item: any) => {
+                const sobrante = Math.max(0, item.prepared - item.consumed);
+                const cost = item.consumed * item.product.price;
+                return `<tr>
+                    <td class="indent"><strong>${item.product.name}</strong></td>
+                    <td class="center">${item.prepared}</td>
+                    <td class="center">${item.consumed}</td>
+                    <td class="center sobrante">${sobrante}</td>
+                    <td class="right">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                    <td class="right bold">${cost.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                </tr>`;
+            }).join('');
+            return headerRow + itemRows;
+        }).join('');
+};
+
+const openInvoice = (html: string) => {
+    const blob = new Blob([html], { type: 'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
+};
+
+
+const downloadDayInvoice = (day: any, orderTitle: string, email = false) => {
+    const rows = buildCategoryRows(day.items);
+    const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Factura ${orderTitle} – ${day.date}</title>
+<style>${INVOICE_STYLES}</style></head>
 <body>
   <div class="header">
     <div>
       <div class="brand">MACARIO<span>.</span></div>
-      <div style="color:#555; margin-top:4px;">Factura Diaria de Pedido</div>
+      <div style="color:#555;margin-top:4px;">Factura Diaria de Pedido</div>
     </div>
     <div class="meta">
       <div class="label">Fecha del pedido</div>
       <div class="value">${day.date}</div>
     </div>
   </div>
-
   <div class="info-grid">
     <div class="info-box">
       <div class="section-title">Evento / Pedido</div>
@@ -74,23 +97,17 @@ const downloadDayInvoice = (day: any, orderTitle: string) => {
       <div class="val">${day.items.length}</div>
     </div>
   </div>
-
   <table>
-    <thead>
-      <tr>
-        <th>Producto</th>
-        <th class="center">Preparado</th>
-        <th class="center">Consumido</th>
-        <th class="center">Sobrante</th>
-        <th class="right">Precio/ud</th>
-        <th class="right">Coste</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows}
-    </tbody>
+    <thead><tr>
+      <th>Producto</th>
+      <th class="center">Preparado</th>
+      <th class="center">Consumido</th>
+      <th class="center">Sobrante</th>
+      <th class="right">Precio/ud</th>
+      <th class="right">Coste</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
   </table>
-
   <div class="totals">
     <div class="total-box total-coste">
       <div class="total-label">Consumo Total</div>
@@ -101,23 +118,99 @@ const downloadDayInvoice = (day: any, orderTitle: string) => {
       <div class="total-amount">${day.loss.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
     </div>
   </div>
-
-  <div class="footer">
-    Generado el ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
-  </div>
-
+  <div class="footer">Generado el ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
   <script>window.onload = function() { window.print(); }</script>
-</body>
-</html>`;
+</body></html>`;
+    return email ? sendViaGmail(html, `Factura-${orderTitle}-${day.date}.html`) : Promise.resolve(openInvoice(html));
+};
 
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+const downloadOrderTotalInvoice = (order: any, email = false) => {
+    const merged: Record<string, any> = {};
+    order.dailyBreakdown.forEach((day: any) => {
+        day.items.forEach((item: any) => {
+            const id = item.product.id;
+            if (!merged[id]) merged[id] = { product: item.product, prepared: 0, consumed: 0 };
+            merged[id].prepared += item.prepared;
+            merged[id].consumed += item.consumed;
+        });
+    });
+
+    const allItems = Object.values(merged);
+    const dateRange = order.dailyBreakdown.length > 1
+        ? `${order.dailyBreakdown[0].date} → ${order.dailyBreakdown[order.dailyBreakdown.length - 1].date}`
+        : order.dailyBreakdown[0]?.date || '';
+    const rows = buildCategoryRows(allItems);
+
+    const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Factura Total – ${order.title}</title>
+<style>${INVOICE_STYLES}</style></head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">MACARIO<span>.</span></div>
+      <div style="color:#555;margin-top:4px;">Factura Total del Evento</div>
+    </div>
+    <div class="meta">
+      <div class="label">Periodo</div>
+      <div class="value">${dateRange}</div>
+    </div>
+  </div>
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="section-title">Evento / Pedido</div>
+      <div class="val">${order.title}</div>
+    </div>
+    <div class="info-box">
+      <div class="section-title">Días registrados</div>
+      <div class="val">${order.dailyBreakdown.length} ${order.dailyBreakdown.length === 1 ? 'día' : 'días'}</div>
+    </div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Producto</th>
+      <th class="center">Total Preparado</th>
+      <th class="center">Total Consumido</th>
+      <th class="center">Total Sobrante</th>
+      <th class="right">Precio/ud</th>
+      <th class="right">Coste Total</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="totals">
+    <div class="total-box total-coste">
+      <div class="total-label">Consumo Total del Evento</div>
+      <div class="total-amount">${order.expense.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+    </div>
+    <div class="total-box total-merma">
+      <div class="total-label">Merma Total del Evento</div>
+      <div class="total-amount">${order.loss.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+    </div>
+  </div>
+  <div class="footer">Generado el ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+  <script>window.onload = function() { window.print(); }</script>
+</body></html>`;
+    return email ? sendViaGmail(html, `Factura-Total-${order.title}.html`) : Promise.resolve(openInvoice(html));
 };
 
 export const FinancialFeriaReport: React.FC = () => {
     const { historicalLogs } = useAppContext();
+    const { addToast } = useToast();
     const [selectedOrderId, setSelectedOrderId] = useState<string>('');
+    const [expandedDay, setExpandedDay] = useState<string | null>(null);
+    const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+
+    const handleEmail = async (fn: () => Promise<void>, key: string) => {
+        setSendingEmail(key);
+        try {
+            await fn();
+            addToast('PDF enviado a la impresora correctamente', 'success');
+        } catch (e: any) {
+            addToast('Error al enviar: ' + (e.message || 'inténtalo de nuevo'), 'error');
+        } finally {
+            setSendingEmail(null);
+        }
+    };
 
     const orderStats = useMemo(() => {
         const stats: Record<string, any> = {};
@@ -199,7 +292,7 @@ export const FinancialFeriaReport: React.FC = () => {
                         <select
                             className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full font-bold"
                             value={selectedOrderId}
-                            onChange={(e) => setSelectedOrderId(e.target.value)}
+                            onChange={(e) => { setSelectedOrderId(e.target.value); setExpandedDay(null); }}
                         >
                             <option value="">-- Seleccionar Pedido --</option>
                             {sortedTitles.map(title => (
@@ -259,7 +352,24 @@ export const FinancialFeriaReport: React.FC = () => {
                         </div>
 
                         <div>
-                            <h4 className="text-sm font-bold uppercase text-text-muted mb-4 border-l-2 border-accent-red pl-3">Facturas por Día</h4>
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-sm font-bold uppercase text-text-muted border-l-2 border-accent-red pl-3">Facturas por Día</h4>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => downloadOrderTotalInvoice(selectedOrder)}
+                                        className="text-[11px] px-3 py-1.5 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold"
+                                    >
+                                        🖨️ Imprimir Total
+                                    </button>
+                                    <button
+                                        disabled={!!sendingEmail}
+                                        onClick={() => handleEmail(() => downloadOrderTotalInvoice(selectedOrder, true), 'total')}
+                                        className="text-[11px] px-3 py-1.5 rounded border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 transition-all font-bold disabled:opacity-50"
+                                    >
+                                        {sendingEmail === 'total' ? '⏳ Enviando...' : '✉️ Email'}
+                                    </button>
+                                </div>
+                            </div>
                             <div className="bg-bg-elevated/20 border border-white/5 rounded-lg overflow-hidden">
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-white/5 text-text-muted uppercase">
@@ -267,25 +377,85 @@ export const FinancialFeriaReport: React.FC = () => {
                                             <th className="p-3">Día</th>
                                             <th className="p-3">Consumo</th>
                                             <th className="p-3 text-center">Merma</th>
-                                            <th className="p-3 text-right">Descargar</th>
+                                            <th className="p-3 text-right">Imprimir</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
-                                        {selectedOrder.dailyBreakdown.map((day: any) => (
-                                            <tr key={day.date} className="hover:bg-white/5">
-                                                <td className="p-3 font-bold tracking-tight text-accent-blue">{day.date}</td>
-                                                <td className="p-3 font-bold">{day.expense.toLocaleString('es-ES')} €</td>
-                                                <td className="p-3 text-center text-accent-red font-bold">{day.loss.toLocaleString('es-ES')} €</td>
-                                                <td className="p-3 text-right">
-                                                    <button
-                                                        onClick={() => downloadDayInvoice(day, selectedOrder.title)}
-                                                        className="text-[11px] px-3 py-1 rounded border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-all font-bold"
+                                        {selectedOrder.dailyBreakdown.map((day: any) => {
+                                            const isOpen = expandedDay === day.date;
+                                            return (
+                                                <React.Fragment key={day.date}>
+                                                    <tr
+                                                        className="hover:bg-white/5 cursor-pointer select-none"
+                                                        onClick={() => setExpandedDay(isOpen ? null : day.date)}
                                                     >
-                                                        📄 Factura
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                        <td className="p-3 font-bold tracking-tight text-accent-blue">
+                                                            <span className="mr-1 text-text-muted">{isOpen ? '▾' : '▸'}</span>
+                                                            {day.date}
+                                                        </td>
+                                                        <td className="p-3 font-bold">{day.expense.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-3 text-center text-accent-red font-bold">{day.loss.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-3 text-right">
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); downloadDayInvoice(day, selectedOrder.title); }}
+                                                                    className="text-[11px] px-3 py-1 rounded border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-all font-bold"
+                                                                >
+                                                                    🖨️ Imprimir
+                                                                </button>
+                                                                <button
+                                                                    disabled={!!sendingEmail}
+                                                                    onClick={(e) => { e.stopPropagation(); handleEmail(() => downloadDayInvoice(day, selectedOrder.title, true), day.date); }}
+                                                                    className="text-[11px] px-3 py-1 rounded border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 transition-all font-bold disabled:opacity-50"
+                                                                >
+                                                                    {sendingEmail === day.date ? '⏳ Enviando...' : '✉️ Email'}
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {isOpen && (
+                                                        <tr>
+                                                            <td colSpan={4} className="p-0 bg-white/[0.03]">
+                                                                <div className="px-4 py-3 border-t border-white/10">
+                                                                    {(() => {
+                                                                        const byCategory: Record<string, any[]> = {};
+                                                                        day.items.forEach((item: any) => {
+                                                                            const cat = item.product.category || 'Sin categoría';
+                                                                            if (!byCategory[cat]) byCategory[cat] = [];
+                                                                            byCategory[cat].push(item);
+                                                                        });
+                                                                        return Object.entries(byCategory)
+                                                                            .sort(([a], [b]) => a.localeCompare(b, 'es'))
+                                                                            .map(([cat, catItems]) => (
+                                                                                <div key={cat} className="mb-3 last:mb-0">
+                                                                                    <div className="text-[9px] uppercase font-black tracking-widest text-text-muted mb-1 pl-1">{cat}</div>
+                                                                                    <table className="w-full text-xs">
+                                                                                        <tbody>
+                                                                                            {catItems.map((item: any) => {
+                                                                                                const sobrante = Math.max(0, item.prepared - item.consumed);
+                                                                                                const cost = item.consumed * item.product.price;
+                                                                                                return (
+                                                                                                    <tr key={item.product.id} className="border-b border-white/5 last:border-0">
+                                                                                                        <td className="py-1.5 pl-2 font-medium">{item.product.name}</td>
+                                                                                                        <td className="py-1.5 text-center text-text-muted">{item.prepared} prep</td>
+                                                                                                        <td className="py-1.5 text-center">{item.consumed} cons</td>
+                                                                                                        <td className="py-1.5 text-center text-accent-red">{sobrante} sob</td>
+                                                                                                        <td className="py-1.5 text-right font-bold pr-2">{cost.toLocaleString('es-ES')} €</td>
+                                                                                                    </tr>
+                                                                                                );
+                                                                                            })}
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                </div>
+                                                                            ));
+                                                                    })()}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>

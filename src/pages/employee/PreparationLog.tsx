@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { InventoryItem } from '../../types';
+import { printRawOrder } from '../master/DailyAudit';
 
 export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: string, onLogCreated?: () => void }> = ({ selectedDate, eventTitle, onLogCreated }) => {
     const { products, openDailyLog } = useAppContext();
@@ -29,7 +30,22 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
         setIsSaving(true);
         try {
             await openDailyLog(selectedDate, items, eventTitle);
-            addToast(`Pedido para ${selectedDate} enviado`, 'success');
+            
+            // Generate the invoice of the gross order
+            const mockLog = { date: selectedDate, eventTitle, items };
+            
+            // 1. Send via Email (which sends to the Brother Printer)
+            try {
+                await printRawOrder(mockLog, true);
+            } catch (printErr: any) {
+                console.error("Error enviando factura por email:", printErr);
+                addToast("Hubo un error enviando la factura por email.", "error");
+            }
+            
+            // 2. ALSO trigger the local browser printer (Impresora local)
+            printRawOrder(mockLog, false);
+
+            addToast(`Pedido para ${selectedDate} enviado e impresoras notificadas`, 'success');
             if (onLogCreated) onLogCreated();
         } catch (error) {
             console.error("Error creating log:", error);

@@ -1,4 +1,4 @@
-export type Role = 'EMPLOYEE' | 'MASTER' | null;
+export type Role = 'EMPLOYEE' | 'MASTER' | 'VIEWER' | null;
 
 export interface Product {
   id: string;

@@ -428,8 +428,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const approveDailyLog = async (id: string) => {
+        const log = state.activeLogs.find(l => l.id === id) || state.historicalLogs.find(l => l.id === id);
         const { error } = await supabase.from('daily_logs').update({ status: 'APPROVED' }).eq('id', id);
         if (error) throw error;
+
+        // Usar cliente limpio (sin rate limiter) igual que el botón de prueba
+        try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+            await sb.functions.invoke('send-web-push', {
+                body: {
+                    title: '📄 Nueva Factura Disponible',
+                    message: `Se ha aprobado el pedido del ${log?.date || ''}${log?.eventTitle ? ` (${log.eventTitle})` : ''}. Ya puedes consultarlo e imprimirlo.`,
+                    target_role: 'VIEWER'
+                },
+                headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
+            });
+        } catch (e) {
+            console.warn('Push VIEWER failed (non-critical):', e);
+        }
+
         await refreshData();
     };
 

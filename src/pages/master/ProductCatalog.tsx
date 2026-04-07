@@ -12,6 +12,7 @@ export const ProductCatalog: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<{ id?: string, type: 'product' | 'category', name: string } | null>(null);
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [search, setSearch] = useState('');
 
     // Combinamos las declaradas globalmente y las que puedan existir en productos antiguos
     const allCategories = Array.from(new Set([
@@ -119,7 +120,10 @@ export const ProductCatalog: React.FC = () => {
         );
     }
 
-    const filteredProducts = products.filter(p => selectedCategory === 'General' || (p.category || 'General') === selectedCategory);
+    const filteredProducts = products.filter(p =>
+        (selectedCategory === 'General' || (p.category || 'General') === selectedCategory) &&
+        (search === '' || p.name.toLowerCase().includes(search.toLowerCase()))
+    );
 
     const handleAddCategoryClick = () => {
         setNewCategoryName('');
@@ -162,7 +166,14 @@ export const ProductCatalog: React.FC = () => {
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
                     <h2 className="text-2xl mb-1">Catálogo de Productos y Costes</h2>
                     <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
-                        <div className="flex w-full sm:w-auto gap-2">
+                        <input
+                            type="text"
+                            placeholder="Buscar producto..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-56 placeholder:text-text-muted"
+                        />
+                        <div className="flex flex-wrap w-full sm:w-auto gap-2 items-center">
                             <select
                                 value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -176,8 +187,8 @@ export const ProductCatalog: React.FC = () => {
                             {selectedCategory !== 'General' &&
                                 <button className="btn btn-outline text-accent-red border-accent-red/50 hover:bg-accent-red/10" title="Eliminar esta sección" onClick={handleDeleteCategory}>🗑️</button>
                             }
+                            <button className="btn btn-primary whitespace-nowrap" onClick={handeNew}>+ Añadir Producto</button>
                         </div>
-                        <button className="btn btn-primary w-full sm:w-auto whitespace-nowrap" onClick={handeNew}>+ Añadir Producto</button>
                     </div>
                 </div>
 
@@ -192,7 +203,10 @@ export const ProductCatalog: React.FC = () => {
                     ).map(([category, items]) => (
                         <div key={category} className="animate-fade-in">
                             <div className="flex items-center gap-4 mb-6">
-                                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent-blue whitespace-nowrap">{category}</h3>
+                                <div className="flex items-baseline gap-2 whitespace-nowrap">
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent-blue leading-none">{category}</h3>
+                                    <span className="text-[10px] text-text-muted leading-none">{items.length} producto{items.length !== 1 ? 's' : ''}</span>
+                                </div>
                                 <div className="h-px w-full bg-gradient-to-r from-accent-blue/40 to-transparent"></div>
                             </div>
                             <div className="grid gap-3">

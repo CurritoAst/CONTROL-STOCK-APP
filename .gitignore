@@ -30,3 +30,6 @@ keys.txt
 vapid-keys.txt
 push-test-output.txt
 .claude/
+
+.vercel
+.env*.local
