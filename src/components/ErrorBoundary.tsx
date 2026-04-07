@@ -16,16 +16,58 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
+  public componentDidMount() {
+    // Escuchar mensajes del Service Worker (cuando un chunk JS falla de cargar)
+    navigator.serviceWorker?.addEventListener('message', (event) => {
+      if (event.data?.type === 'RELOAD_PAGE') {
+        window.location.reload();
+      }
+    });
+  }
+
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("⛔ ALERTA URGENTE: Un error no capturado casi cuelga la página:", error, errorInfo);
+    console.error('⛔ Error capturado por ErrorBoundary:', error, errorInfo);
+
+    // Si el error es un fallo al cargar un módulo (chunk de Vite obsoleto),
+    // recargamos automáticamente para obtener los assets nuevos.
+    const isChunkError = (
+      error.message?.includes('Failed to fetch dynamically imported module') ||
+      error.message?.includes('Importing a module script failed') ||
+      error.message?.includes('dynamically imported module') ||
+      error.message?.includes('Unable to preload CSS') ||
+      error.message?.includes('error loading dynamically imported module')
+    );
+
+    if (isChunkError) {
+      console.warn('🔄 Detectado chunk obsoleto. Recargando app...');
+      setTimeout(() => window.location.reload(), 500);
+    }
   }
 
   public render() {
     if (this.state.hasError) {
+      const isChunkError = (
+        this.state.error?.message?.includes('Failed to fetch dynamically imported module') ||
+        this.state.error?.message?.includes('dynamically imported module') ||
+        this.state.error?.message?.includes('Unable to preload CSS')
+      );
+
+      if (isChunkError) {
+        // Pantalla de actualización - se recargará sola
+        return (
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
+            <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-blue-500/30">
+              <div className="text-5xl mb-4 animate-spin">🔄</div>
+              <h1 className="text-2xl font-bold text-slate-100 mb-4">Actualizando...</h1>
+              <p className="text-slate-400 text-sm">Hay una nueva versión disponible. Cargando...</p>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
           <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-red-500/30">
@@ -34,14 +76,8 @@ class ErrorBoundary extends Component<Props, State> {
             </svg>
             <h1 className="text-2xl font-bold text-slate-100 mb-4 tracking-tight">Vaya, algo ha fallado</h1>
             <p className="text-slate-400 mb-6 text-sm">
-              Nuestros escudos de protección han interceptado un error inesperado (posible bucle o saturación).
-              Hemos bloqueado la caída total de la aplicación.
+              Nuestros escudos de protección han interceptado un error inesperado.
             </p>
-            <div className="bg-slate-900 p-3 rounded-lg text-left overflow-hidden mb-6 hidden">
-               <code className="text-xs text-red-400 break-words font-mono">
-                  {this.state.error?.message}
-               </code>
-            </div>
             <button
               onClick={() => window.location.reload()}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-indigo-500/25 active:scale-[0.98]"
@@ -58,3 +94,4 @@ class ErrorBoundary extends Component<Props, State> {
 }
 
 export default ErrorBoundary;
+
