@@ -41,11 +41,8 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
                 console.error("Error enviando factura por email:", printErr);
                 addToast("Hubo un error enviando la factura por email.", "error");
             }
-            
-            // 2. ALSO trigger the local browser printer (Impresora local)
-            printRawOrder(mockLog, false);
 
-            addToast(`Pedido para ${selectedDate} enviado e impresoras notificadas`, 'success');
+            addToast(`Pedido para ${selectedDate} enviado a cocina e impresoras notificadas`, 'success');
             if (onLogCreated) onLogCreated();
         } catch (error) {
             console.error("Error creating log:", error);

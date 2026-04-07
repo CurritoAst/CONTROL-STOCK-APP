@@ -370,8 +370,8 @@ export const FinancialFeriaReport: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
-                            <div className="bg-bg-elevated/20 border border-white/5 rounded-lg overflow-hidden">
-                                <table className="w-full text-left text-xs">
+                            <div className="bg-bg-elevated/20 border border-white/5 rounded-lg overflow-x-auto">
+                                <table className="w-full text-left text-xs min-w-[500px]">
                                     <thead className="bg-white/5 text-text-muted uppercase">
                                         <tr>
                                             <th className="p-3">Día</th>
