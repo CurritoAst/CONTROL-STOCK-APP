@@ -242,24 +242,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // and assume it's still alive.
         }
 
-        // ⛔ NOTIFICACIONES PUSH DESACTIVADAS TEMPORALMENTE (pruebas)
-        // const triggerPushToMasters = async (title: string, message: string) => {
-        //     await supabase.functions.invoke('send-web-push', {
-        //         body: { title, message, target_role: 'MASTER' },
-        //         headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
-        //     });
-        // };
+        const triggerPushToMasters = async (title: string, message: string) => {
+            await supabase.functions.invoke('send-web-push', {
+                body: { title, message, target_role: 'MASTER' },
+                headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
+            });
+        };
 
         // Realtime subscription - listen for new orders and events
         const channel = supabase.channel('schema-db-changes')
             .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
                 if (payload.eventType === 'INSERT') {
-                    // ⛔ PUSH DESACTIVADO TEMPORALMENTE
-                    // if (payload.table === 'daily_logs') {
-                    //     triggerPushToMasters('📦 Nuevo Pedido Creado', 'La cocina ha enviado un nuevo pedido. Pendiente de revisión.');
-                    // } else if (payload.table === 'events') {
-                    //     triggerPushToMasters('📅 Nuevo Evento Programado', 'Se ha añadido un nuevo evento o feria al calendario.');
-                    // }
+                    if (payload.table === 'daily_logs') {
+                        triggerPushToMasters('📦 Nuevo Pedido Creado', 'La cocina ha enviado un nuevo pedido. Pendiente de revisión.');
+                    } else if (payload.table === 'events') {
+                        triggerPushToMasters('📅 Nuevo Evento Programado', 'Se ha añadido un nuevo evento o feria al calendario.');
+                    }
                 }
                 refreshData();
             })
@@ -347,15 +345,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (itemsError) throw itemsError;
         }
 
-        // ⛔ NOTIFICACIONES PUSH DESACTIVADAS TEMPORALMENTE (pruebas)
-        // supabase.functions.invoke('send-web-push', {
-        //     body: {
-        //         title: '📦 Nuevo Pedido Creado',
-        //         message: `La cocina ha enviado un pedido para el ${date}${eventTitle ? ` (${eventTitle})` : ''}. Pendiente de revisión.`,
-        //         target_role: 'MASTER'
-        //     },
-        //     headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
-        // }).catch(e => console.warn('Push notification failed (non-critical):', e));
+        // Notify masters via push notification - called from employee's device
+        // so it fires even when the master app is closed
+        supabase.functions.invoke('send-web-push', {
+            body: {
+                title: '📦 Nuevo Pedido Creado',
+                message: `La cocina ha enviado un pedido para el ${date}${eventTitle ? ` (${eventTitle})` : ''}. Pendiente de revisión.`,
+                target_role: 'MASTER'
+            },
+            headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
+        }).catch(e => console.warn('Push notification failed (non-critical):', e));
 
         await refreshData();
     };
