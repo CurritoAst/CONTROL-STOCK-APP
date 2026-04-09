@@ -162,7 +162,7 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
             const id = item.product.id;
             if (!merged[id]) {
                 const markupPrice = item.product.price * 1.25;
-                merged[id] = { product: { ...item.product, price: markupPrice }, prepared: 0, consumed: 0 };
+                merged[id] = { product: { ...item.product, price: markupPrice, originalPrice: item.product.price }, prepared: 0, consumed: 0 };
             }
             merged[id].prepared += item.prepared;
             merged[id].consumed += item.consumed;
