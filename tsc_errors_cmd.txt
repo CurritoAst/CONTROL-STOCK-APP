@@ -1,0 +1,2 @@
+src/context/AppContext.tsx(246,15): error TS6133: 'triggerPushToMasters' is declared but its value is never read.
+src/context/AppContext.tsx(259,72): error TS6133: 'payload' is declared but its value is never read.

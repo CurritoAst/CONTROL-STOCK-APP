@@ -1,0 +1,18 @@
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 93 modules transformed.
+rendering chunks...
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) C:/Users/curri/OneDrive/Desktop/PROYECTOS/PROYECTO MACARIO/node_modules/@supabase/supabase-js/dist/index.mjs is dynamically imported by C:/Users/curri/OneDrive/Desktop/PROYECTOS/PROYECTO MACARIO/src/context/AppContext.tsx, C:/Users/curri/OneDrive/Desktop/PROYECTOS/PROYECTO MACARIO/src/context/AppContext.tsx, C:/Users/curri/OneDrive/Desktop/PROYECTOS/PROYECTO MACARIO/src/pages/master/MasterDashboard.tsx, C:/Users/curri/OneDrive/Desktop/PROYECTOS/PROYECTO MACARIO/src/pages/viewer/SaulDashboard.tsx but also statically imported by C:/Users/curri/OneDrive/Desktop/PROYECTOS/PROYECTO MACARIO/src/context/AppContext.tsx, C:/Users/curri/OneDrive/Desktop/PROYECTOS/PROYECTO MACARIO/src/lib/supabaseClient.ts, dynamic import will not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mindex.html                            [39m[1m[2m  1.09 kB[22m[1m[22m[2m │ gzip:   0.51 kB[22m
+[2mdist/[22m[35massets/index-DFa8Nefk.css             [39m[1m[2m 38.17 kB[22m[1m[22m[2m │ gzip:   7.18 kB[22m
+[2mdist/[22m[36massets/gmailSend-DKLyBJOl.js          [39m[1m[2m  0.46 kB[22m[1m[22m[2m │ gzip:   0.37 kB[22m
+[2mdist/[22m[36massets/printUtils-CgW6WFNU.js         [39m[1m[2m  4.05 kB[22m[1m[22m[2m │ gzip:   1.78 kB[22m
+[2mdist/[22m[36massets/UsageReport-Bx5EJRjF.js        [39m[1m[2m  5.64 kB[22m[1m[22m[2m │ gzip:   1.87 kB[22m
+[2mdist/[22m[36massets/SaulDashboard-6Z3VH-Su.js      [39m[1m[2m 13.97 kB[22m[1m[22m[2m │ gzip:   4.28 kB[22m
+[2mdist/[22m[36massets/EmployeeDashboard-DmjPsjM7.js  [39m[1m[2m 31.45 kB[22m[1m[22m[2m │ gzip:   7.94 kB[22m
+[2mdist/[22m[36massets/MasterDashboard-CB-5roGE.js    [39m[1m[2m 79.43 kB[22m[1m[22m[2m │ gzip:  19.09 kB[22m
+[2mdist/[22m[36massets/index-CioVRXU1.js              [39m[1m[2m342.40 kB[22m[1m[22m[2m │ gzip: 100.01 kB[22m
+[32m✓ built in 1.69s[39m

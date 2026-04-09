@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppState, Role, Product, DailyLog, InventoryItem, EventType } from '../types';
 import { supabase } from '../lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 import { useToast } from './ToastContext';
 
 interface AppContextType extends AppState {
@@ -242,21 +243,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // and assume it's still alive.
         }
 
-        const triggerPushToMasters = async (title: string, message: string) => {
-            try {
-                const { createClient } = await import('@supabase/supabase-js');
-                const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-                await sb.functions.invoke('send-web-push', {
-                    body: { title, message, target_role: 'MASTER' },
-                    headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
-                });
-            } catch (e) {
-                console.warn('Push notification failed (non-critical):', e);
-            }
-        };
-
         const channel = supabase.channel('schema-db-changes')
-            .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public' }, () => {
                 refreshData();
             })
             .subscribe();
@@ -521,7 +509,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
             // Send push notification when an event is successfully created
             try {
-                const { createClient } = await import('@supabase/supabase-js');
                 const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
                 await sb.functions.invoke('send-web-push', {
                     body: { title: '📅 Nuevo Evento Programado', message: 'Se ha añadido un nuevo evento o feria al calendario.', target_role: 'MASTER' },
