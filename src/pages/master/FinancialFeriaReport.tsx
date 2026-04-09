@@ -37,7 +37,7 @@ const INVOICE_STYLES = `
   @media print { body { padding: 20px; } @page { margin: 12mm; } }
 `;
 
-const buildCategoryRows = (items: any[]) => {
+const buildCategoryRows = (items: any[], showMarkupColumns = false) => {
     const byCategory: Record<string, any[]> = {};
     items.forEach(item => {
         const cat = item.product.category || 'Sin categoría';
@@ -47,16 +47,26 @@ const buildCategoryRows = (items: any[]) => {
     return Object.entries(byCategory)
         .sort(([a], [b]) => a.localeCompare(b, 'es'))
         .map(([cat, catItems]) => {
-            const headerRow = `<tr class="cat-header"><td colspan="6">${cat}</td></tr>`;
+            const colspan = showMarkupColumns ? 7 : 6;
+            const headerRow = `<tr class="cat-header"><td colspan="${colspan}">${cat}</td></tr>`;
             const itemRows = catItems.map((item: any) => {
                 const sobrante = Math.max(0, item.prepared - item.consumed);
                 const cost = item.consumed * item.product.price;
+
+                let pricingCells = `<td class="right">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>`;
+                if (showMarkupColumns && item.product.originalPrice) {
+                    pricingCells = `
+                        <td class="right" style="color: #888; text-decoration: line-through; font-size: 11px;">${item.product.originalPrice.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                        <td class="right bold" style="color: #1d4ed8;">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                    `;
+                }
+
                 return `<tr>
                     <td class="indent"><strong>${item.product.name}</strong></td>
                     <td class="center">${item.prepared}</td>
                     <td class="center">${item.consumed}</td>
                     <td class="center sobrante">${sobrante}</td>
-                    <td class="right">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                    ${pricingCells}
                     <td class="right bold">${cost.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
                 </tr>`;
             }).join('');
@@ -151,7 +161,7 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
     const dateRange = order.dailyBreakdown.length > 1
         ? `${order.dailyBreakdown[0].date} → ${order.dailyBreakdown[order.dailyBreakdown.length - 1].date}`
         : order.dailyBreakdown[0]?.date || '';
-    const rows = buildCategoryRows(allItems);
+    const rows = buildCategoryRows(allItems, true);
 
     const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
@@ -184,7 +194,8 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
       <th class="center">Total Preparado</th>
       <th class="center">Total Consumido</th>
       <th class="center">Total Sobrante</th>
-      <th class="right">Precio/ud</th>
+      <th class="right">Base/ud</th>
+      <th class="right">+25%/ud</th>
       <th class="right">Coste Total</th>
     </tr></thead>
     <tbody>${rows}</tbody>
