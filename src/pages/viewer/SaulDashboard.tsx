@@ -5,36 +5,36 @@ import { sendViaGmail } from '../../lib/gmailSend';
 
 const INVOICE_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 48px; color: #111; font-size: 13px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #111; padding-bottom: 20px; margin-bottom: 28px; }
-  .brand { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 48px; color: #111; font-size: 17px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #111; padding-bottom: 24px; margin-bottom: 32px; }
+  .brand { font-size: 38px; font-weight: 900; letter-spacing: -0.5px; }
   .brand span { color: #e05c00; }
   .meta { text-align: right; }
-  .meta .label { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 700; }
-  .meta .value { font-size: 15px; font-weight: 700; }
-  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 700; margin-bottom: 6px; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
-  .info-box { background: #f7f7f7; border-radius: 8px; padding: 14px 16px; }
-  .info-box .val { font-size: 15px; font-weight: 700; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
-  thead th { background: #111; color: #fff; padding: 9px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
-  tbody td { padding: 9px 12px; border-bottom: 1px solid #eee; }
+  .meta .label { font-size: 13px; text-transform: uppercase; color: #888; font-weight: 700; }
+  .meta .value { font-size: 20px; font-weight: 700; }
+  .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 700; margin-bottom: 8px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px; }
+  .info-box { background: #f7f7f7; border-radius: 8px; padding: 20px 24px; }
+  .info-box .val { font-size: 20px; font-weight: 700; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+  thead th { background: #111; color: #fff; padding: 14px 16px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  tbody td { padding: 14px 16px; border-bottom: 1px solid #eee; font-size: 17px; }
   tbody tr:last-child td { border-bottom: none; }
-  .cat-header td { background: #f0f0f0; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: #444; padding: 7px 12px; border-bottom: 1px solid #ddd; }
-  .indent { padding-left: 22px !important; }
+  .cat-header td { background: #f0f0f0; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #444; padding: 12px 16px; border-bottom: 2px solid #ddd; }
+  .indent { padding-left: 28px !important; }
   .center { text-align: center; }
   .right { text-align: right; }
   .bold { font-weight: 700; }
   .sobrante { color: #dc2626; font-weight: 700; }
-  .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .total-box { border-radius: 8px; padding: 18px 20px; }
+  .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .total-box { border-radius: 12px; padding: 24px 28px; }
   .total-coste { background: #eff6ff; border: 2px solid #3b82f6; }
   .total-merma { background: #fff5f5; border: 2px solid #ef4444; }
-  .total-label { font-size: 10px; text-transform: uppercase; color: #666; font-weight: 700; margin-bottom: 6px; }
-  .total-coste .total-amount { font-size: 28px; font-weight: 900; color: #1d4ed8; }
-  .total-merma .total-amount { font-size: 28px; font-weight: 900; color: #dc2626; }
-  .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 14px; }
-  @media print { body { padding: 20px; } @page { margin: 12mm; } }
+  .total-label { font-size: 14px; text-transform: uppercase; color: #666; font-weight: 700; margin-bottom: 8px; }
+  .total-coste .total-amount { font-size: 42px; font-weight: 900; color: #1d4ed8; }
+  .total-merma .total-amount { font-size: 42px; font-weight: 900; color: #dc2626; }
+  .footer { margin-top: 50px; text-align: center; font-size: 14px; color: #aaa; border-top: 1px solid #eee; padding-top: 20px; }
+  @media print { body { padding: 24px; } @page { margin: 12mm; } }
 `;
 
 const buildCategoryRows = (items: any[]) => {
