@@ -56,7 +56,7 @@ const buildCategoryRows = (items: any[], showMarkupColumns = false) => {
                 let pricingCells = `<td class="right">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>`;
                 if (showMarkupColumns && item.product.originalPrice !== undefined) {
                     pricingCells = `
-                        <td class="right" style="color: #888; text-decoration: line-through; font-size: 11px;">${item.product.originalPrice.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                        <td class="right" style="color: #888; font-size: 11px;">${item.product.originalPrice.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
                         <td class="right bold" style="color: #1d4ed8;">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
                     `;
                 }
