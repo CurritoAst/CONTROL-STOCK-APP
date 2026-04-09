@@ -54,7 +54,7 @@ const buildCategoryRows = (items: any[], showMarkupColumns = false) => {
                 const cost = item.consumed * item.product.price;
 
                 let pricingCells = `<td class="right">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>`;
-                if (showMarkupColumns && item.product.originalPrice) {
+                if (showMarkupColumns && item.product.originalPrice !== undefined) {
                     pricingCells = `
                         <td class="right" style="color: #888; text-decoration: line-through; font-size: 11px;">${item.product.originalPrice.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
                         <td class="right bold" style="color: #1d4ed8;">${item.product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
@@ -81,7 +81,24 @@ const openInvoice = (html: string) => {
 
 
 const downloadDayInvoice = (day: any, orderTitle: string, email = false) => {
-    const rows = buildCategoryRows(day.items);
+    let invoiceTotalExpense = 0;
+    let invoiceTotalLoss = 0;
+
+    const markedUpItems = day.items.map((item: any) => {
+        const sobrante = Math.max(0, item.prepared - item.consumed);
+        const originalPrice = item.product.price;
+        const markupPrice = originalPrice * 1.25;
+
+        invoiceTotalExpense += item.consumed * markupPrice;
+        invoiceTotalLoss += sobrante * markupPrice;
+
+        return {
+            ...item,
+            product: { ...item.product, price: markupPrice, originalPrice: originalPrice }
+        };
+    });
+
+    const rows = buildCategoryRows(markedUpItems, true);
     const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <title>Factura ${orderTitle} – ${day.date}</title>
@@ -113,19 +130,20 @@ const downloadDayInvoice = (day: any, orderTitle: string, email = false) => {
       <th class="center">Preparado</th>
       <th class="center">Consumido</th>
       <th class="center">Sobrante</th>
-      <th class="right">Precio/ud</th>
-      <th class="right">Coste</th>
+      <th class="right">Base/ud</th>
+      <th class="right">+25%/ud</th>
+      <th class="right">Coste Total</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="totals">
     <div class="total-box total-coste">
       <div class="total-label">Consumo Total</div>
-      <div class="total-amount">${day.expense.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+      <div class="total-amount">${invoiceTotalExpense.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
     </div>
     <div class="total-box total-merma">
       <div class="total-label">Merma Total</div>
-      <div class="total-amount">${day.loss.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+      <div class="total-amount">${invoiceTotalLoss.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
     </div>
   </div>
   <div class="footer">Generado el ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
