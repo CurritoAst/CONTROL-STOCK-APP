@@ -122,7 +122,7 @@ export const EmployeeDashboard: React.FC = () => {
                     <div className="animate-fade-in flex flex-col gap-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/20 p-4 rounded-lg border border-white/10">
                             <span className="text-sm font-medium text-text-muted">Filtrar por Sección:</span>
-                            <select 
+                            <select
                                 className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-auto"
                                 value={editCategory || "General"}
                                 onChange={(e) => setEditCategory(e.target.value === "General" ? "" : e.target.value)}
@@ -137,11 +137,11 @@ export const EmployeeDashboard: React.FC = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
                             {products
                                 .filter(p => !editCategory || p.category === editCategory)
-                                .sort((a,b) => a.name.localeCompare(b.name))
+                                .sort((a, b) => a.name.localeCompare(b.name))
                                 .map(product => {
                                     const currentItem = currentLog.items.find(i => i.product.id === product.id);
                                     const qty = editQuantities[product.id] ?? (currentItem?.prepared || 0);
-                                    
+
                                     const reservedByOthers = (product.reserved || 0) - (currentItem?.prepared || 0);
                                     const availableStock = product.stock + (currentItem?.prepared || 0) - reservedByOthers;
                                     const isOutOfStock = availableStock <= 0;
@@ -157,15 +157,15 @@ export const EmployeeDashboard: React.FC = () => {
                                                     </span>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <button 
+                                                    <button
                                                         className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold"
                                                         onClick={() => setEditQuantities(prev => ({ ...prev, [product.id]: Math.max(0, qty - 1) }))}
                                                     >-</button>
                                                     <span className={`text-xl font-bold w-10 text-center ${qty > 0 ? 'text-accent-blue' : 'text-text-muted'}`}>{qty}</span>
-                                                    <button 
+                                                    <button
                                                         className="w-8 h-8 rounded-full bg-white/10 hover:bg-accent-blue/40 text-white flex items-center justify-center font-bold"
                                                         onClick={() => {
                                                             if (!isOutOfStock) {
@@ -193,7 +193,7 @@ export const EmployeeDashboard: React.FC = () => {
                                     prepared: editQuantities[p.id] ?? (currentLog.items.find(i => i.product.id === p.id)?.prepared ?? 0)
                                 }));
                             if (itemsToUpdate.length === 0) { addToast('El pedido debe tener al menos un producto.', 'error'); return; }
-                            
+
                             setIsSaving(true);
                             try {
                                 await updatePedidoItems(currentLog.id, itemsToUpdate);
@@ -378,6 +378,14 @@ export const EmployeeDashboard: React.FC = () => {
                         </div>
                     </div>
                     <p className="mt-8 text-text-muted text-sm italic">"Buen trabajo, equipo."</p>
+                    <div className="flex justify-center mt-6">
+                        <button
+                            className="btn btn-outline py-2 px-4 text-sm bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue"
+                            onClick={() => setShowExtraModal(true)}
+                        >
+                            ➕ Añadir Pedido Extra / Olvidado
+                        </button>
+                    </div>
                 </div>
             );
         }
@@ -391,11 +399,17 @@ export const EmployeeDashboard: React.FC = () => {
                         <h2 className="text-2xl font-bold text-text-muted">Jornada Completada</h2>
                         <p className="text-sm text-text-muted mt-1">Todos los pedidos para el {selectedDate} han sido cerrados.</p>
                     </div>
-                    <div className="flex justify-center mt-6">
-                        <button 
-                            className="btn btn-outline text-xs"
+                    <div className="flex flex-col sm:flex-row justify-center mt-8 gap-3">
+                        <button
+                            className="btn btn-outline text-sm"
                             onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
                         >Ir al día de hoy</button>
+                        <button
+                            className="btn btn-outline text-sm bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue"
+                            onClick={() => setShowExtraModal(true)}
+                        >
+                            ➕ Añadir Pedido Extra
+                        </button>
                     </div>
                 </div>
             );
