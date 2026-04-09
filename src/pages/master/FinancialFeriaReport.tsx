@@ -126,16 +126,28 @@ const downloadDayInvoice = (day: any, orderTitle: string, email = false) => {
 
 const downloadOrderTotalInvoice = (order: any, email = false) => {
     const merged: Record<string, any> = {};
+    let invoiceTotalExpense = 0;
+    let invoiceTotalLoss = 0;
+
     order.dailyBreakdown.forEach((day: any) => {
         day.items.forEach((item: any) => {
             const id = item.product.id;
-            if (!merged[id]) merged[id] = { product: item.product, prepared: 0, consumed: 0 };
+            if (!merged[id]) {
+                const markupPrice = item.product.price * 1.25;
+                merged[id] = { product: { ...item.product, price: markupPrice }, prepared: 0, consumed: 0 };
+            }
             merged[id].prepared += item.prepared;
             merged[id].consumed += item.consumed;
         });
     });
 
     const allItems = Object.values(merged);
+    allItems.forEach((i: any) => {
+        const sobrante = Math.max(0, i.prepared - i.consumed);
+        invoiceTotalExpense += i.consumed * i.product.price;
+        invoiceTotalLoss += sobrante * i.product.price;
+    });
+
     const dateRange = order.dailyBreakdown.length > 1
         ? `${order.dailyBreakdown[0].date} → ${order.dailyBreakdown[order.dailyBreakdown.length - 1].date}`
         : order.dailyBreakdown[0]?.date || '';
@@ -180,11 +192,11 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
   <div class="totals">
     <div class="total-box total-coste">
       <div class="total-label">Consumo Total del Evento</div>
-      <div class="total-amount">${order.expense.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+      <div class="total-amount">${invoiceTotalExpense.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
     </div>
     <div class="total-box total-merma">
       <div class="total-label">Merma Total del Evento</div>
-      <div class="total-amount">${order.loss.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+      <div class="total-amount">${invoiceTotalLoss.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
     </div>
   </div>
   <div class="footer">Generado el ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</div>

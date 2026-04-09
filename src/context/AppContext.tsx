@@ -107,7 +107,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 console.error(error);
             }
         }
-        
+
         await refreshProducts();
     };
 
@@ -243,22 +243,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         const triggerPushToMasters = async (title: string, message: string) => {
-            await supabase.functions.invoke('send-web-push', {
-                body: { title, message, target_role: 'MASTER' },
-                headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
-            });
+            try {
+                const { createClient } = await import('@supabase/supabase-js');
+                const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+                await sb.functions.invoke('send-web-push', {
+                    body: { title, message, target_role: 'MASTER' },
+                    headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
+                });
+            } catch (e) {
+                console.warn('Push notification failed (non-critical):', e);
+            }
         };
 
-        // Realtime subscription - listen for new orders and events
         const channel = supabase.channel('schema-db-changes')
             .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-                if (payload.eventType === 'INSERT') {
-                    if (payload.table === 'daily_logs') {
-                        triggerPushToMasters('📦 Nuevo Pedido Creado', 'La cocina ha enviado un nuevo pedido. Pendiente de revisión.');
-                    } else if (payload.table === 'events') {
-                        triggerPushToMasters('📅 Nuevo Evento Programado', 'Se ha añadido un nuevo evento o feria al calendario.');
-                    }
-                }
                 refreshData();
             })
             .subscribe();
@@ -347,14 +345,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Notify masters via push notification - called from employee's device
         // so it fires even when the master app is closed
-        supabase.functions.invoke('send-web-push', {
-            body: {
-                title: '📦 Nuevo Pedido Creado',
-                message: `La cocina ha enviado un pedido para el ${date}${eventTitle ? ` (${eventTitle})` : ''}. Pendiente de revisión.`,
-                target_role: 'MASTER'
-            },
-            headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
-        }).catch(e => console.warn('Push notification failed (non-critical):', e));
+        try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+            await sb.functions.invoke('send-web-push', {
+                body: {
+                    title: '📦 Nuevo Pedido Creado',
+                    message: `La cocina ha enviado un pedido para el ${date}${eventTitle ? ` (${eventTitle})` : ''}. Pendiente de revisión.`,
+                    target_role: 'MASTER'
+                },
+                headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
+            });
+        } catch (e) {
+            console.warn('Push notification failed (non-critical):', e);
+        }
 
         await refreshData();
     };
@@ -397,7 +401,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         for (const item of itemsWithConsumption) {
             const oldItem = currentLog.items.find(i => i.product.id === item.product.id);
             const oldConsumed = oldItem?.consumed || 0;
-            
+
             // update consumed in DB
             await supabase.from('log_items').update({ consumed: item.consumed })
                 .eq('daily_log_id', id)
@@ -515,6 +519,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             addToast("Error al guardar el evento", "error");
             console.error(error);
         } else {
+            // Send push notification when an event is successfully created
+            try {
+                const { createClient } = await import('@supabase/supabase-js');
+                const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+                await sb.functions.invoke('send-web-push', {
+                    body: { title: '📅 Nuevo Evento Programado', message: 'Se ha añadido un nuevo evento o feria al calendario.', target_role: 'MASTER' },
+                    headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
+                });
+            } catch (e) {
+                console.warn('Push notification failed (non-critical):', e);
+            }
             await refreshData();
         }
     };
