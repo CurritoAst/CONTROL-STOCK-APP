@@ -534,28 +534,58 @@ export const EmployeeDashboard: React.FC = () => {
                 )}
 
                 {/* Programmed casetas pending init */}
-                {availableProgrammedOrders.length > 0 && (
-                    <div className="mb-4">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3 px-1">Casetas Programadas sin Iniciar</h3>
-                        <div className="flex flex-col gap-3">
-                            {availableProgrammedOrders.map(po => (
-                                <button
-                                    key={po.id}
-                                    onClick={() => setSelectedCaseta(po.title)}
-                                    className="p-4 border border-dashed border-accent-green/40 bg-accent-green/5 rounded-lg hover:bg-accent-green/10 flex justify-between items-center group transition-colors text-left"
-                                >
-                                    <div>
-                                        <div className="font-bold text-accent-green">{po.title}</div>
-                                        <div className="text-sm text-text-muted mt-0.5">Caseta programada por el Master</div>
+                {availableProgrammedOrders.length > 0 && (() => {
+                    const groupedProgrammedOrders = availableProgrammedOrders.reduce((acc, po) => {
+                        let group = "Generales";
+                        let display = po.title;
+                        if (po.title.startsWith('Pedido ')) {
+                            const text = po.title.substring(7);
+                            if (text.includes(' - Caseta: ')) {
+                                const parts = text.split(' - Caseta: ');
+                                group = parts[0];
+                                display = parts[1];
+                            } else {
+                                group = text;
+                                display = 'Caseta Principal';
+                            }
+                        } else if (po.title.includes(' - Caseta: ')) {
+                            const parts = po.title.split(' - Caseta: ');
+                            group = parts[0];
+                            display = parts[1];
+                        }
+                        if (!acc[group]) acc[group] = [];
+                        acc[group].push({ ...po, displayName: display });
+                        return acc;
+                    }, {} as Record<string, (typeof availableProgrammedOrders[0] & { displayName: string })[]>);
+
+                    return (
+                        <div className="mb-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3 px-1">Casetas Programadas sin Iniciar</h3>
+                            <div className="flex flex-col gap-4">
+                                {Object.entries(groupedProgrammedOrders).map(([groupName, pos]) => (
+                                    <div key={groupName} className="flex flex-col gap-2">
+                                        <h4 className="text-[10px] font-black uppercase tracking-wider text-accent-blue/80 px-1">{groupName}</h4>
+                                        {pos.map(po => (
+                                            <button
+                                                key={po.id}
+                                                onClick={() => setSelectedCaseta(po.title)}
+                                                className="p-3 border border-dashed border-accent-green/40 bg-accent-green/5 rounded-lg hover:bg-accent-green/10 flex justify-between items-center group transition-colors text-left"
+                                            >
+                                                <div>
+                                                    <div className="font-bold text-accent-green">{po.displayName}</div>
+                                                    <div className="text-xs text-text-muted mt-0.5">Caseta programada</div>
+                                                </div>
+                                                <div className="text-accent-green text-xs font-bold shrink-0 bg-accent-green/10 px-3 py-1.5 rounded-md">
+                                                    Gestionar →
+                                                </div>
+                                            </button>
+                                        ))}
                                     </div>
-                                    <div className="text-accent-green text-sm font-bold shrink-0 bg-accent-green/10 px-3 py-1.5 rounded-md">
-                                        Gestionar →
-                                    </div>
-                                </button>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
 
                 {/* Action buttons — only if not finished */}
                 {!isWorkdayFinished && (
@@ -637,29 +667,57 @@ export const EmployeeDashboard: React.FC = () => {
                     </div>
 
                     {/* Caseta list */}
-                    <div className="p-4 flex flex-col gap-2 max-h-72 overflow-y-auto">
-                        {allCasetas.length > 0 ? (
-                            allCasetas.map(caseta => {
-                                const existingExtras = logsForDate.filter(
-                                    l => l.eventTitle?.startsWith(caseta) && l.eventTitle?.includes('Extra')
-                                ).length;
-                                return (
-                                    <button
-                                        key={caseta}
-                                        className="w-full text-left p-4 rounded-xl border border-white/10 bg-bg-elevated/40 hover:bg-accent-blue/10 hover:border-accent-blue/40 transition-all flex items-center justify-between group"
-                                        onClick={() => handleSelectCaseta(caseta)}
-                                    >
-                                        <div>
-                                            <div className="font-semibold text-white group-hover:text-accent-blue transition-colors">{caseta}</div>
-                                            {existingExtras > 0 && (
-                                                <div className="text-xs text-text-muted mt-0.5">{existingExtras} extra{existingExtras > 1 ? 's' : ''} ya realizados</div>
-                                            )}
-                                        </div>
-                                        <span className="text-accent-blue text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity">Seleccionar →</span>
-                                    </button>
-                                );
-                            })
-                        ) : (
+                    <div className="p-4 flex flex-col gap-4 max-h-72 overflow-y-auto w-full">
+                        {allCasetas.length > 0 ? (() => {
+                            const groupedCasetas = allCasetas.reduce((acc, caseta) => {
+                                let group = "Generales";
+                                let display = caseta;
+                                if (caseta.startsWith('Pedido ')) {
+                                    const text = caseta.substring(7);
+                                    if (text.includes(' - Caseta: ')) {
+                                        const parts = text.split(' - Caseta: ');
+                                        group = parts[0];
+                                        display = parts[1];
+                                    } else {
+                                        group = text;
+                                        display = 'Caseta Principal';
+                                    }
+                                } else if (caseta.includes(' - Caseta: ')) {
+                                    const parts = caseta.split(' - Caseta: ');
+                                    group = parts[0];
+                                    display = parts[1];
+                                }
+                                if (!acc[group]) acc[group] = [];
+                                acc[group].push({ fullTitle: caseta, displayName: display });
+                                return acc;
+                            }, {} as Record<string, { fullTitle: string, displayName: string }[]>);
+
+                            return Object.entries(groupedCasetas).map(([groupName, casetasEnGrupo]) => (
+                                <div key={groupName} className="flex flex-col gap-2">
+                                    <h4 className="text-[10px] font-black uppercase tracking-wider text-accent-blue/80 px-1">{groupName}</h4>
+                                    {casetasEnGrupo.map(c => {
+                                        const existingExtras = logsForDate.filter(
+                                            l => l.eventTitle?.startsWith(c.fullTitle) && l.eventTitle?.includes('Extra')
+                                        ).length;
+                                        return (
+                                            <button
+                                                key={c.fullTitle}
+                                                className="w-full text-left p-3 rounded-xl border border-white/10 bg-bg-elevated/40 hover:bg-accent-blue/10 hover:border-accent-blue/40 transition-all flex items-center justify-between group"
+                                                onClick={() => handleSelectCaseta(c.fullTitle)}
+                                            >
+                                                <div className="min-w-0 pr-2">
+                                                    <div className="font-semibold text-white group-hover:text-accent-blue transition-colors truncate">{c.displayName}</div>
+                                                    {existingExtras > 0 && (
+                                                        <div className="text-xs text-text-muted mt-0.5">{existingExtras} extra{existingExtras > 1 ? 's' : ''} ya realizados</div>
+                                                    )}
+                                                </div>
+                                                <span className="text-accent-blue text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Seleccionar →</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ));
+                        })() : (
                             <p className="text-text-muted text-sm text-center py-4">No hay casetas programadas para este día.</p>
                         )}
                     </div>
