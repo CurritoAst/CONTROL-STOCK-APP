@@ -321,6 +321,29 @@ export const FinancialFeriaReport: React.FC = () => {
     const selectedOrder = orderStats[selectedOrderId];
     const sortedTitles = Object.keys(orderStats).sort();
 
+    const groupedTitles = sortedTitles.reduce((acc, title) => {
+        let group = "Generales";
+        let display = title;
+        if (title.startsWith('Pedido ')) {
+            const text = title.substring(7);
+            if (text.includes(' - Caseta: ')) {
+                const parts = text.split(' - Caseta: ');
+                group = parts[0];
+                display = parts[1];
+            } else {
+                group = text;
+                display = 'Caseta Principal';
+            }
+        } else if (title.includes(' - Caseta: ')) {
+            const parts = title.split(' - Caseta: ');
+            group = parts[0];
+            display = parts[1];
+        }
+        if (!acc[group]) acc[group] = [];
+        acc[group].push({ title, display });
+        return acc;
+    }, {} as Record<string, { title: string, display: string }[]>);
+
     return (
         <div className="animate-fade-in space-y-8 mt-6">
             <div className="card">
@@ -336,8 +359,12 @@ export const FinancialFeriaReport: React.FC = () => {
                             onChange={(e) => { setSelectedOrderId(e.target.value); setExpandedDay(null); }}
                         >
                             <option value="">-- Seleccionar Pedido --</option>
-                            {sortedTitles.map(title => (
-                                <option key={title} value={title}>{title}</option>
+                            {Object.entries(groupedTitles).map(([groupName, items]) => (
+                                <optgroup key={groupName} label={groupName}>
+                                    {items.map(item => (
+                                        <option key={item.title} value={item.title}>{item.display}</option>
+                                    ))}
+                                </optgroup>
                             ))}
                         </select>
                     </div>
