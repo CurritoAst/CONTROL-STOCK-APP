@@ -84,22 +84,30 @@ export const EmployeeDashboard: React.FC = () => {
         // --- DEVOLUCIÓN TOTAL ---
         if (showTotalReturn !== null) {
             // Collect all dates that belong to this feria (EVENT-type events with this title)
+            // showTotalReturn represents the specific base caseta title, e.g., "Pedido Feria de Prueba - Caseta: A"
+            // Wait, how do we know the feriadates? We can find the feria associated by looking at the event title.
+            // Let's assume we pass { feriaName: string, casetaBase: string } to showTotalReturn
+            const parsedToken = JSON.parse(showTotalReturn);
+            const { feriaName, casetaBase } = parsedToken;
+
             const feriaDates = new Set(
                 events
-                    .filter(e => e.type === 'EVENT' && e.title === showTotalReturn)
+                    .filter(e => e.type === 'EVENT' && e.title === feriaName)
                     .map(e => e.date)
             );
-            // Get all logs from those feria dates that are in a closeable state
+            // Get all logs from those feria dates for THIS specific caseta
             const feriaLogs = allLogs.filter(l =>
                 feriaDates.has(l.date) &&
+                l.eventTitle &&
+                l.eventTitle.replace(/\s*\(Extra \d+\)$/, '') === casetaBase &&
                 (l.status === 'OPEN' || l.status === 'APPROVED' || l.status === 'CLOSED')
             );
             return (
                 <div className="animate-fade-in">
                     <div className="mb-4 flex items-center justify-between bg-accent-blue/10 border border-accent-blue/20 p-4 rounded-lg">
                         <div>
-                            <span className="text-text-muted text-sm block">Finalizando Feria:</span>
-                            <strong className="text-accent-blue">{showTotalReturn}</strong>
+                            <span className="text-text-muted text-sm block">Cierre Total de:</span>
+                            <strong className="text-accent-blue">{casetaBase}</strong>
                         </div>
                         <button className="btn btn-outline text-sm shrink-0" onClick={() => setShowTotalReturn(null)}>← Volver</button>
                     </div>
@@ -416,11 +424,26 @@ export const EmployeeDashboard: React.FC = () => {
         }
 
         // 3. Default Gestionar Panel
+
+        // Find all base casetas active today for the final day feria
+        let baseCasetas: string[] = [];
+        if (isFinalDay) {
+            baseCasetas = Array.from(new Set(
+                logsForDate
+                    .filter(l => l.eventTitle && l.eventTitle.includes(feriaNameFinalDay))
+                    .map(l => l.eventTitle!.replace(/\s*\(Extra \d+\)$/, ''))
+            ));
+            // If there are no specific casetas, just use the generic one
+            if (baseCasetas.length === 0) {
+                baseCasetas = [`Pedido ${feriaNameFinalDay}`];
+            }
+        }
+
         return (
             <div className="animate-fade-in">
                 {/* Final day banner */}
                 {isFinalDay && (
-                    <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-accent-blue/10 border border-accent-blue/30 rounded-xl p-4">
+                    <div className="mb-4 flex flex-col items-start gap-3 bg-accent-blue/10 border border-accent-blue/30 rounded-xl p-4">
                         <div className="flex items-center gap-3">
                             <span className="text-3xl">🎪</span>
                             <div>
@@ -428,12 +451,25 @@ export const EmployeeDashboard: React.FC = () => {
                                 <div className="text-sm text-text-muted">{feriaNameFinalDay}</div>
                             </div>
                         </div>
-                        <button
-                            className="btn btn-primary flex items-center gap-2 shrink-0 w-full sm:w-auto"
-                            onClick={() => setShowTotalReturn(feriaNameFinalDay)}
-                        >
-                            🏁 Cierre Total de Feria
-                        </button>
+                        <div className="w-full mt-2 flex flex-col gap-2">
+                            {baseCasetas.map(casetaBase => {
+                                // Check if this caseta is already closed for today
+                                const casetaLogsToday = logsForDate.filter(l => l.eventTitle && l.eventTitle.replace(/\s*\(Extra \d+\)$/, '') === casetaBase);
+                                const isClosed = casetaLogsToday.length > 0 && casetaLogsToday.every(l => l.status === 'CLOSED' || l.status === 'APPROVED');
+                                
+                                return (
+                                    <button
+                                        key={casetaBase}
+                                        className={`btn flex items-center justify-between gap-2 shrink-0 w-full p-3 ${isClosed ? 'bg-accent-green/10 border-accent-green/30 text-accent-green opacity-70' : 'btn-primary'}`}
+                                        onClick={() => setShowTotalReturn(JSON.stringify({ feriaName: feriaNameFinalDay, casetaBase }))}
+                                        disabled={isClosed}
+                                    >
+                                        <span className="font-semibold">{isClosed ? '✅ Cierre Completado' : '🏁 Cierre Total'}</span>
+                                        <span className="text-sm opacity-90 truncate max-w-[60%] text-right">{casetaBase}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 
