@@ -140,6 +140,7 @@ export const EventAnalytics: React.FC = () => {
                 daysCount: data.days.size,
                 casetasCount: data.casetas.size,
                 casetasList: Array.from(data.casetas),
+                firstDate: Array.from(data.days).sort()[0] || '9999-12-31',
                 totalExpenses,
                 totalDevoluciones,
                 itemsCount,
@@ -154,7 +155,7 @@ export const EventAnalytics: React.FC = () => {
                     items: Object.values(c.items).filter(it => it.consumed > 0 || it.leftover > 0)
                 }))
             };
-        }).sort((a, b) => b.totalExpenses - a.totalExpenses);
+        }).sort((a, b) => a.firstDate.localeCompare(b.firstDate));
     }, [events, historicalLogs]);
 
     const handleEventExpand = (title: string) => {
