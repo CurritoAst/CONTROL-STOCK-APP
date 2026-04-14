@@ -441,63 +441,6 @@ export const PointOfSale: React.FC = () => {
                 </div>
             </div>
 
-            {Object.keys(feriaGroups).length > 0 && (
-                <div className="card animate-fade-in">
-                    <h3 className="text-xl font-bold mb-4">📅 Ferias Programadas</h3>
-                    <div className="grid gap-3">
-                        {Object.entries(feriaGroups).map(([feriaName, group]) => {
-                            const firstDay = group.dates[0];
-                            const lastDay = group.dates[group.dates.length - 1];
-                            const numDays = group.dates.length;
-                            const isEditing = editingFeriaName === feriaName;
-                            return (
-                                <div key={feriaName} className="bg-bg-elevated p-4 rounded-lg border border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                    <div>
-                                        <div className="font-bold text-lg">{feriaName}</div>
-                                        <div className="text-text-muted text-sm mt-1 flex items-center gap-2 flex-wrap">
-                                            <span>{firstDay === lastDay ? firstDay : `${firstDay} → ${lastDay}`}</span>
-                                            <span className="badge badge-blue">{numDays} {numDays === 1 ? 'día' : 'días'}</span>
-                                        </div>
-                                    </div>
-                                    {isEditing ? (
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <button
-                                                className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 text-sm py-1.5 px-4 disabled:opacity-40"
-                                                onClick={() => handleRemoveDayFromFeria(feriaName)}
-                                                disabled={isSaving || numDays <= 1}
-                                                title={numDays <= 1 ? 'No se puede quitar el único día' : `Quitar el día ${lastDay}`}
-                                            >
-                                                − 1 Día
-                                            </button>
-                                            <button
-                                                className="btn btn-outline border-accent-green/30 text-accent-green hover:bg-accent-green/10 text-sm py-1.5 px-4 disabled:opacity-40"
-                                                onClick={() => handleAddDayToFeria(feriaName)}
-                                                disabled={isSaving}
-                                            >
-                                                + 1 Día
-                                            </button>
-                                            <button
-                                                className="btn btn-outline text-sm py-1.5 px-4"
-                                                onClick={() => setEditingFeriaName(null)}
-                                            >
-                                                ✓ Listo
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <button
-                                            className="btn btn-outline text-sm py-1.5 px-3"
-                                            onClick={() => setEditingFeriaName(feriaName)}
-                                        >
-                                            ✏️ Editar días
-                                        </button>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
             {selectedDate && (
                 <div className="card animate-fade-in border-t-4 border-t-accent-blue">
                     <div className="flex justify-between items-center mb-6">
@@ -508,37 +451,86 @@ export const PointOfSale: React.FC = () => {
                         <p className="text-text-muted text-center py-8 bg-black/20 rounded-lg">No hay eventos o pedidos programados para este día.</p>
                     ) : (
                         <div className="grid gap-3">
-                            {selectedDayEvents.map(evt => (
-                                <div key={evt.id} className="bg-bg-elevated p-4 rounded-lg border border-white/5 flex flex-col gap-2">
-                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer hover:bg-white/5 p-2 -mx-2 rounded transition-colors" onClick={() => handleExpandEvent(evt)}>
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`badge ${evt.type === 'EVENT' ? 'bg-accent-blue/20 text-accent-blue' : 'bg-accent-green/20 text-accent-green'}`}>
-                                                    {evt.type === 'EVENT' ? '📅 Evento (Feria/Fiesta)' : '📦 Previsión Pedido'}
-                                                </span>
-                                                <span className="font-bold text-lg">{evt.title}</span>
-                                            </div>
-                                            {evt.description && <p className="text-text-muted text-sm mt-2">{evt.description}</p>}
-                                        </div>
-                                        <div className="flex items-center gap-3 w-full sm:w-auto">
-                                            <span className="text-text-muted text-sm shrink-0">
-                                                {expandedEventId === evt.id ? '↑ Ocultar' : '↓ Ver Detalles'}
-                                            </span>
-                                            <button
-                                                className="btn btn-outline text-accent-red border-accent-red/30 hover:bg-accent-red/20 shrink-0 ml-auto sm:ml-2"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteEvent(evt);
-                                                }}
-                                            >
-                                                Eliminar
-                                            </button>
-                                        </div>
-                                    </div>
+                            {(() => {
+                                const shownFeriaEditors = new Set<string>();
+                                return selectedDayEvents.map(evt => {
+                                    const feriaName = evt.title.replace(/^Pedido /, '').split(' - Caseta: ')[0].trim();
+                                    const group = feriaGroups[feriaName];
+                                    const showEditor = group && !shownFeriaEditors.has(feriaName);
+                                    if (showEditor) shownFeriaEditors.add(feriaName);
+                                    const isEditingDays = editingFeriaName === feriaName;
 
-                                    {expandedEventId === evt.id && renderOrderDetails(evt)}
-                                </div>
-                            ))}
+                                    return (
+                                        <div key={evt.id} className="bg-bg-elevated p-4 rounded-lg border border-white/5 flex flex-col gap-2">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer hover:bg-white/5 p-2 -mx-2 rounded transition-colors" onClick={() => handleExpandEvent(evt)}>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className={`badge ${evt.type === 'EVENT' ? 'bg-accent-blue/20 text-accent-blue' : 'bg-accent-green/20 text-accent-green'}`}>
+                                                            {evt.type === 'EVENT' ? '📅 Evento (Feria/Fiesta)' : '📦 Previsión Pedido'}
+                                                        </span>
+                                                        <span className="font-bold text-lg">{evt.title}</span>
+                                                    </div>
+                                                    {evt.description && <p className="text-text-muted text-sm mt-2">{evt.description}</p>}
+                                                </div>
+                                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                                                    <span className="text-text-muted text-sm shrink-0">
+                                                        {expandedEventId === evt.id ? '↑ Ocultar' : '↓ Ver Detalles'}
+                                                    </span>
+                                                    <button
+                                                        className="btn btn-outline text-accent-red border-accent-red/30 hover:bg-accent-red/20 shrink-0 ml-auto sm:ml-2"
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteEvent(evt); }}
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {showEditor && (
+                                                <div className="border-t border-white/10 pt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                                    <div className="text-sm text-text-muted flex items-center gap-2 flex-wrap">
+                                                        <span>📅 {group.dates[0] === group.dates[group.dates.length - 1] ? group.dates[0] : `${group.dates[0]} → ${group.dates[group.dates.length - 1]}`}</span>
+                                                        <span className="badge badge-blue">{group.dates.length} {group.dates.length === 1 ? 'día' : 'días'}</span>
+                                                    </div>
+                                                    {isEditingDays ? (
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <button
+                                                                className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 text-sm py-1 px-3 disabled:opacity-40"
+                                                                onClick={() => handleRemoveDayFromFeria(feriaName)}
+                                                                disabled={isSaving || group.dates.length <= 1}
+                                                                title={group.dates.length <= 1 ? 'No se puede quitar el único día' : `Quitar el día ${group.dates[group.dates.length - 1]}`}
+                                                            >
+                                                                − 1 Día
+                                                            </button>
+                                                            <button
+                                                                className="btn btn-outline border-accent-green/30 text-accent-green hover:bg-accent-green/10 text-sm py-1 px-3 disabled:opacity-40"
+                                                                onClick={() => handleAddDayToFeria(feriaName)}
+                                                                disabled={isSaving}
+                                                            >
+                                                                + 1 Día
+                                                            </button>
+                                                            <button
+                                                                className="btn btn-outline text-sm py-1 px-3"
+                                                                onClick={() => setEditingFeriaName(null)}
+                                                            >
+                                                                ✓ Listo
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            className="btn btn-outline text-sm py-1 px-3"
+                                                            onClick={() => setEditingFeriaName(feriaName)}
+                                                        >
+                                                            ✏️ Editar días
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {expandedEventId === evt.id && renderOrderDetails(evt)}
+                                        </div>
+                                    );
+                                });
+                            })()}
                         </div>
                     )}
                 </div>
