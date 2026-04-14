@@ -27,6 +27,8 @@ export const PointOfSale: React.FC = () => {
     const [isAddingNewCaseta, setIsAddingNewCaseta] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [editingFeriaName, setEditingFeriaName] = useState<string | null>(null);
+    const [editFeriaStart, setEditFeriaStart] = useState('');
+    const [editFeriaEnd, setEditFeriaEnd] = useState('');
 
     // Compute existing Ferias and their Casetas
     const feriasConfig = useMemo(() => {
@@ -233,40 +235,58 @@ export const PointOfSale: React.FC = () => {
         ));
     };
 
-    const handleAddDayToFeria = async (feriaName: string) => {
-        if (isSaving) return;
+    const openEditFeria = (feriaName: string) => {
         const group = feriaGroups[feriaName];
-        if (!group || group.dates.length === 0) return;
-        setIsSaving(true);
-        try {
-            const lastDate = group.dates[group.dates.length - 1];
-            const [y, m, d] = lastDate.split('-').map(Number);
-            const nextDateObj = new Date(y, m - 1, d);
-            nextDateObj.setDate(nextDateObj.getDate() + 1);
-            const nextDateStr = `${nextDateObj.getFullYear()}-${String(nextDateObj.getMonth() + 1).padStart(2, '0')}-${String(nextDateObj.getDate()).padStart(2, '0')}`;
-            const uniqueTitles = Array.from(new Set(
-                events
-                    .filter((e: EventType) => e.date === lastDate && e.title.replace(/^Pedido /, '').split(' - Caseta: ')[0].trim() === feriaName)
-                    .map((e: EventType) => e.title)
-            ));
-            for (let i = 0; i < uniqueTitles.length; i++) {
-                await addEvent({ id: `evt-${Date.now()}-${i}`, date: nextDateStr, title: uniqueTitles[i], type: 'EVENT', description: '' });
-            }
-        } catch (e) { console.error(e); } finally { setIsSaving(false); }
+        if (!group) return;
+        setEditFeriaStart(group.dates[0]);
+        setEditFeriaEnd(group.dates[group.dates.length - 1]);
+        setEditingFeriaName(feriaName);
     };
 
-    const handleRemoveDayFromFeria = async (feriaName: string) => {
+    const handleSaveFeriaDates = async (feriaName: string) => {
+        if (isSaving || !editFeriaStart || !editFeriaEnd) return;
         const group = feriaGroups[feriaName];
-        if (!group || group.dates.length <= 1) return;
-        const lastDate = group.dates[group.dates.length - 1];
-        if (!window.confirm(`¿Quitar el día ${lastDate} de la feria "${feriaName}"?`)) return;
-        if (isSaving) return;
+        if (!group) return;
+
+        const [sy, sm, sd] = editFeriaStart.split('-').map(Number);
+        const [ey, em, ed] = editFeriaEnd.split('-').map(Number);
+        const startObj = new Date(sy, sm - 1, sd);
+        const endObj = new Date(ey, em - 1, ed);
+        if (endObj < startObj) return;
+
+        const newDates: string[] = [];
+        const cur = new Date(startObj);
+        while (cur <= endObj) {
+            newDates.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        const existingSet = new Set(group.dates);
+        const newSet = new Set(newDates);
+        const datesToAdd = newDates.filter(d => !existingSet.has(d));
+        const datesToRemove = group.dates.filter(d => !newSet.has(d));
+
+        const uniqueRef = Array.from(new Map(
+            events
+                .filter((e: EventType) => e.title.replace(/^Pedido /, '').split(' - Caseta: ')[0].trim() === feriaName)
+                .map((e: EventType) => [e.title, e.type])
+        ).entries());
+
         setIsSaving(true);
         try {
-            const lastDayEvents = events.filter(
-                (e: EventType) => e.date === lastDate && e.title.replace(/^Pedido /, '').split(' - Caseta: ')[0].trim() === feriaName
-            );
-            for (const evt of lastDayEvents) await removeEvent(evt.id);
+            for (const date of datesToAdd) {
+                for (let i = 0; i < uniqueRef.length; i++) {
+                    const [title, type] = uniqueRef[i];
+                    await addEvent({ id: `evt-${Date.now()}-${i}-${date}`, date, title, type: type as 'EVENT' | 'ORDER', description: '' });
+                }
+            }
+            for (const date of datesToRemove) {
+                const toDelete = events.filter(
+                    (e: EventType) => e.date === date && e.title.replace(/^Pedido /, '').split(' - Caseta: ')[0].trim() === feriaName
+                );
+                for (const ev of toDelete) await removeEvent(ev.id);
+            }
+            setEditingFeriaName(null);
         } catch (e) { console.error(e); } finally { setIsSaving(false); }
     };
 
@@ -492,33 +512,47 @@ export const PointOfSale: React.FC = () => {
                                                         <span className="badge badge-blue">{group.dates.length} {group.dates.length === 1 ? 'día' : 'días'}</span>
                                                     </div>
                                                     {isEditingDays ? (
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <button
-                                                                className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 text-sm py-1 px-3 disabled:opacity-40"
-                                                                onClick={() => handleRemoveDayFromFeria(feriaName)}
-                                                                disabled={isSaving || group.dates.length <= 1}
-                                                                title={group.dates.length <= 1 ? 'No se puede quitar el único día' : `Quitar el día ${group.dates[group.dates.length - 1]}`}
-                                                            >
-                                                                − 1 Día
-                                                            </button>
-                                                            <button
-                                                                className="btn btn-outline border-accent-green/30 text-accent-green hover:bg-accent-green/10 text-sm py-1 px-3 disabled:opacity-40"
-                                                                onClick={() => handleAddDayToFeria(feriaName)}
-                                                                disabled={isSaving}
-                                                            >
-                                                                + 1 Día
-                                                            </button>
-                                                            <button
-                                                                className="btn btn-outline text-sm py-1 px-3"
-                                                                onClick={() => setEditingFeriaName(null)}
-                                                            >
-                                                                ✓ Listo
-                                                            </button>
+                                                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap">
+                                                            <div className="flex items-center gap-2">
+                                                                <label className="text-xs text-text-muted whitespace-nowrap">Desde</label>
+                                                                <input
+                                                                    type="date"
+                                                                    className="bg-black/30 border border-white/20 rounded p-1.5 text-white text-sm outline-none focus:border-accent-blue"
+                                                                    value={editFeriaStart}
+                                                                    onChange={e => setEditFeriaStart(e.target.value)}
+                                                                />
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <label className="text-xs text-text-muted whitespace-nowrap">Hasta</label>
+                                                                <input
+                                                                    type="date"
+                                                                    className="bg-black/30 border border-white/20 rounded p-1.5 text-white text-sm outline-none focus:border-accent-blue"
+                                                                    value={editFeriaEnd}
+                                                                    min={editFeriaStart}
+                                                                    onChange={e => setEditFeriaEnd(e.target.value)}
+                                                                />
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    className="btn btn-primary text-sm py-1 px-3 disabled:opacity-40"
+                                                                    onClick={() => handleSaveFeriaDates(feriaName)}
+                                                                    disabled={isSaving || !editFeriaStart || !editFeriaEnd}
+                                                                >
+                                                                    {isSaving ? '⏳' : '✓ Guardar'}
+                                                                </button>
+                                                                <button
+                                                                    className="btn btn-outline text-sm py-1 px-3"
+                                                                    onClick={() => setEditingFeriaName(null)}
+                                                                    disabled={isSaving}
+                                                                >
+                                                                    Cancelar
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     ) : (
                                                         <button
                                                             className="btn btn-outline text-sm py-1 px-3"
-                                                            onClick={() => setEditingFeriaName(feriaName)}
+                                                            onClick={() => openEditFeria(feriaName)}
                                                         >
                                                             ✏️ Editar días
                                                         </button>
