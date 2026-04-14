@@ -26,6 +26,7 @@ export const PointOfSale: React.FC = () => {
     const [editingItems, setEditingItems] = useState<{ product: any, prepared: number }[]>([]);
     const [isAddingNewCaseta, setIsAddingNewCaseta] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [editingFeriaName, setEditingFeriaName] = useState<string | null>(null);
 
     // Compute existing Ferias and their Casetas
     const feriasConfig = useMemo(() => {
@@ -86,6 +87,20 @@ export const PointOfSale: React.FC = () => {
 
         return combined;
     }, [events, activeLogs, historicalLogs]);
+
+    // Group all feria entries (EVENT and ORDER) by base feria name to enable day editing
+    const feriaGroups = useMemo(() => {
+        const groups: Record<string, { dates: string[], eventTitles: string[] }> = {};
+        events.forEach((evt: EventType) => {
+            // Strip "Pedido " prefix (ORDER-type) then strip caseta suffix
+            const baseName = evt.title.replace(/^Pedido /, '').split(' - Caseta: ')[0].trim();
+            if (!groups[baseName]) groups[baseName] = { dates: [], eventTitles: [] };
+            if (!groups[baseName].dates.includes(evt.date)) groups[baseName].dates.push(evt.date);
+            if (!groups[baseName].eventTitles.includes(evt.title)) groups[baseName].eventTitles.push(evt.title);
+        });
+        for (const g of Object.values(groups)) g.dates.sort();
+        return groups;
+    }, [events]);
 
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -216,6 +231,43 @@ export const PointOfSale: React.FC = () => {
         setEditingItems(prev => prev.map(item =>
             item.product.id === productId ? { ...item, prepared: Math.max(0, newQuantity) } : item
         ));
+    };
+
+    const handleAddDayToFeria = async (feriaName: string) => {
+        if (isSaving) return;
+        const group = feriaGroups[feriaName];
+        if (!group || group.dates.length === 0) return;
+        setIsSaving(true);
+        try {
+            const lastDate = group.dates[group.dates.length - 1];
+            const [y, m, d] = lastDate.split('-').map(Number);
+            const nextDateObj = new Date(y, m - 1, d);
+            nextDateObj.setDate(nextDateObj.getDate() + 1);
+            const nextDateStr = `${nextDateObj.getFullYear()}-${String(nextDateObj.getMonth() + 1).padStart(2, '0')}-${String(nextDateObj.getDate()).padStart(2, '0')}`;
+            const uniqueTitles = Array.from(new Set(
+                events
+                    .filter((e: EventType) => e.date === lastDate && e.title.replace(/^Pedido /, '').split(' - Caseta: ')[0].trim() === feriaName)
+                    .map((e: EventType) => e.title)
+            ));
+            for (let i = 0; i < uniqueTitles.length; i++) {
+                await addEvent({ id: `evt-${Date.now()}-${i}`, date: nextDateStr, title: uniqueTitles[i], type: 'EVENT', description: '' });
+            }
+        } catch (e) { console.error(e); } finally { setIsSaving(false); }
+    };
+
+    const handleRemoveDayFromFeria = async (feriaName: string) => {
+        const group = feriaGroups[feriaName];
+        if (!group || group.dates.length <= 1) return;
+        const lastDate = group.dates[group.dates.length - 1];
+        if (!window.confirm(`¿Quitar el día ${lastDate} de la feria "${feriaName}"?`)) return;
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            const lastDayEvents = events.filter(
+                (e: EventType) => e.date === lastDate && e.title.replace(/^Pedido /, '').split(' - Caseta: ')[0].trim() === feriaName
+            );
+            for (const evt of lastDayEvents) await removeEvent(evt.id);
+        } catch (e) { console.error(e); } finally { setIsSaving(false); }
     };
 
     const saveOrderChanges = async (evt: EventType) => {
@@ -388,6 +440,63 @@ export const PointOfSale: React.FC = () => {
                     {renderCalendar()}
                 </div>
             </div>
+
+            {Object.keys(feriaGroups).length > 0 && (
+                <div className="card animate-fade-in">
+                    <h3 className="text-xl font-bold mb-4">📅 Ferias Programadas</h3>
+                    <div className="grid gap-3">
+                        {Object.entries(feriaGroups).map(([feriaName, group]) => {
+                            const firstDay = group.dates[0];
+                            const lastDay = group.dates[group.dates.length - 1];
+                            const numDays = group.dates.length;
+                            const isEditing = editingFeriaName === feriaName;
+                            return (
+                                <div key={feriaName} className="bg-bg-elevated p-4 rounded-lg border border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div>
+                                        <div className="font-bold text-lg">{feriaName}</div>
+                                        <div className="text-text-muted text-sm mt-1 flex items-center gap-2 flex-wrap">
+                                            <span>{firstDay === lastDay ? firstDay : `${firstDay} → ${lastDay}`}</span>
+                                            <span className="badge badge-blue">{numDays} {numDays === 1 ? 'día' : 'días'}</span>
+                                        </div>
+                                    </div>
+                                    {isEditing ? (
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <button
+                                                className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 text-sm py-1.5 px-4 disabled:opacity-40"
+                                                onClick={() => handleRemoveDayFromFeria(feriaName)}
+                                                disabled={isSaving || numDays <= 1}
+                                                title={numDays <= 1 ? 'No se puede quitar el único día' : `Quitar el día ${lastDay}`}
+                                            >
+                                                − 1 Día
+                                            </button>
+                                            <button
+                                                className="btn btn-outline border-accent-green/30 text-accent-green hover:bg-accent-green/10 text-sm py-1.5 px-4 disabled:opacity-40"
+                                                onClick={() => handleAddDayToFeria(feriaName)}
+                                                disabled={isSaving}
+                                            >
+                                                + 1 Día
+                                            </button>
+                                            <button
+                                                className="btn btn-outline text-sm py-1.5 px-4"
+                                                onClick={() => setEditingFeriaName(null)}
+                                            >
+                                                ✓ Listo
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            className="btn btn-outline text-sm py-1.5 px-3"
+                                            onClick={() => setEditingFeriaName(feriaName)}
+                                        >
+                                            ✏️ Editar días
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {selectedDate && (
                 <div className="card animate-fade-in border-t-4 border-t-accent-blue">
