@@ -243,9 +243,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // and assume it's still alive.
         }
 
+        let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+        const debouncedRefresh = () => {
+            if (refreshTimeout) clearTimeout(refreshTimeout);
+            refreshTimeout = setTimeout(() => refreshData(), 600);
+        };
+
         const channel = supabase.channel('schema-db-changes')
             .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-                refreshData();
+                debouncedRefresh();
             })
             .subscribe();
 
@@ -257,6 +263,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return () => {
             supabase.removeChannel(channel);
             clearInterval(refreshInterval);
+            if (refreshTimeout) clearTimeout(refreshTimeout);
         };
     }, []);
 

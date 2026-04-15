@@ -10,8 +10,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // --- Escudo de Peticiones (Rate Limiter) ---
 // Evita ataques de denegación de servicio en el frontend o bucles infinitos accidentales.
 // Limite: 50 peticiones cada 10 segundos por cliente.
-const REQUEST_LIMIT = 50; 
-const TIME_WINDOW = 10000; 
+const REQUEST_LIMIT = 200;
+const TIME_WINDOW = 10000;
 let requestTimes: number[] = [];
 
 // Custom fetch interceptor
