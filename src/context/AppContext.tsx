@@ -362,9 +362,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const log = state.activeLogs.find(l => l.id === id);
         if (!log) return;
 
-        // Decrease stock
+        // Safety check: verify the order is still PENDING_PEDIDO in DB (prevents double-decrement)
+        const { data: currentLogStatus } = await supabase.from('daily_logs').select('status').eq('id', id).single();
+        if (currentLogStatus?.status !== 'PENDING_PEDIDO') return;
+
+        // Decrease stock using CURRENT values from DB, not stale state
         for (const item of log.items) {
-            const newStock = Math.max(0, item.product.stock - item.prepared);
+            const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', item.product.id).single();
+            const currentStock = freshProduct?.stock ?? item.product.stock;
+            const newStock = Math.max(0, currentStock - item.prepared);
             await supabase.from('products').update({ stock: newStock }).eq('id', item.product.id);
         }
 
@@ -419,7 +425,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
 
             if (stockAdjustment !== 0) {
-                const newStock = Math.max(0, item.product.stock + stockAdjustment);
+                const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', item.product.id).single();
+                const currentStock = freshProduct?.stock ?? item.product.stock;
+                const newStock = Math.max(0, currentStock + stockAdjustment);
                 await supabase.from('products').update({ stock: newStock }).eq('id', item.product.id);
             }
         }
