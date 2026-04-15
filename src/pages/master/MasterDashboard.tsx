@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DailyAudit } from './DailyAudit';
 import { ProductCatalog } from './ProductCatalog';
 import { AnalyticsContainer } from './AnalyticsContainer';
@@ -6,12 +6,50 @@ import { MasterCalendar } from './MasterCalendar';
 import { PointOfSale } from './PointOfSale';
 import { FinancialFeriaReport } from './FinancialFeriaReport';
 import { useAppContext } from '../../context/AppContext';
+import { supabase } from '../../lib/supabaseClient';
 
 export const MasterDashboard: React.FC<{
     activeTab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS';
     onTabChange: (tab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS') => void;
 }> = ({ activeTab, onTabChange }) => {
     const { historicalLogs, activeLogs, deleteDailyLog, isPushEnabled, requestPushPermission } = useAppContext();
+    const [isBackingUp, setIsBackingUp] = useState(false);
+
+    const downloadBackup = async () => {
+        setIsBackingUp(true);
+        try {
+            const [
+                { data: products },
+                { data: events },
+                { data: logs },
+                { data: items }
+            ] = await Promise.all([
+                supabase.from('products').select('*'),
+                supabase.from('events').select('*'),
+                supabase.from('daily_logs').select('*'),
+                supabase.from('log_items').select('*')
+            ]);
+
+            const backup = {
+                fecha: new Date().toISOString(),
+                products: products || [],
+                events: events || [],
+                daily_logs: logs || [],
+                log_items: items || []
+            };
+
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const fecha = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+            a.href = url;
+            a.download = `backup-macario-${fecha}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } finally {
+            setIsBackingUp(false);
+        }
+    };
 
     // Basic Finances Calculation
     const totalExpenses = historicalLogs.reduce((acc, log) => {
@@ -206,6 +244,23 @@ export const MasterDashboard: React.FC<{
                     </div>
 
                     <FinancialFeriaReport />
+
+                    <div className="card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="text-3xl">💾</div>
+                            <div>
+                                <h4 className="font-bold leading-tight mb-1">Copia de Seguridad</h4>
+                                <p className="text-sm text-text-muted">Descarga todos los datos (productos, stock, pedidos, eventos) a tu dispositivo.</p>
+                            </div>
+                        </div>
+                        <button
+                            className="btn btn-outline whitespace-nowrap w-full sm:w-auto shrink-0 disabled:opacity-50"
+                            onClick={downloadBackup}
+                            disabled={isBackingUp}
+                        >
+                            {isBackingUp ? '⏳ Descargando...' : '💾 Descargar Backup'}
+                        </button>
+                    </div>
                 </div>
             )}
 
