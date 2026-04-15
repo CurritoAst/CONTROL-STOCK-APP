@@ -10,7 +10,7 @@ import { printRawOrder } from '../../lib/printUtils';
 
 
 export const DailyAudit: React.FC = () => {
-    const { activeLogs, products, approveDailyLog, approvePedido, rejectPedido, deleteDailyLog, updatePedidoItems } = useAppContext();
+    const { activeLogs, products, approveDailyLog, approvePedido, rejectPedido, deleteDailyLog, updatePedidoItems, repairPendingStock } = useAppContext();
     const { addToast } = useToast();
     const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
@@ -34,6 +34,7 @@ export const DailyAudit: React.FC = () => {
     const [editCategory, setEditCategory] = useState<string>("");
     const [isSaving, setIsSaving] = useState(false);
     const [approvingId, setApprovingId] = useState<string | null>(null);
+    const [isRepairing, setIsRepairing] = useState(false);
 
     if (logsToAudit.length === 0) {
         return (
@@ -88,8 +89,38 @@ export const DailyAudit: React.FC = () => {
 
     const categories = Array.from(new Set(products.map(p => p.category || 'General'))).sort();
 
+    const handleRepairStock = async () => {
+        if (!window.confirm('¿Reparar el stock? Esto devolverá el stock de todos los productos que aparecen en pedidos pendientes al valor correcto antes de aprobarlos.')) return;
+        setIsRepairing(true);
+        try {
+            const fixed = await repairPendingStock();
+            addToast(`Stock reparado correctamente en ${fixed} producto${fixed !== 1 ? 's' : ''}.`, 'success');
+        } catch (e: any) {
+            addToast('Error al reparar stock: ' + (e.message || 'inténtalo de nuevo'), 'error');
+        } finally {
+            setIsRepairing(false);
+        }
+    };
+
+    const hasPending = logsToAudit.some(l => l.status === 'PENDING_PEDIDO');
+
     return (
         <div className="flex flex-col gap-6">
+            {hasPending && (
+                <div className="bg-accent-red/10 border border-accent-red/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <p className="font-bold text-accent-red">⚠️ Reparación de stock disponible</p>
+                        <p className="text-sm text-text-muted mt-1">Si hubo problemas al aprobar pedidos anteriormente, usa este botón para restaurar el stock correcto antes de aprobar.</p>
+                    </div>
+                    <button
+                        className="btn btn-outline border-accent-red/40 text-accent-red hover:bg-accent-red/10 whitespace-nowrap shrink-0 disabled:opacity-50"
+                        onClick={handleRepairStock}
+                        disabled={isRepairing}
+                    >
+                        {isRepairing ? '⏳ Reparando...' : '🔧 Reparar Stock'}
+                    </button>
+                </div>
+            )}
             {logsToAudit.map(log => {
                 if (log.status === 'PENDING_PEDIDO' || log.status === 'OPEN') {
                     const isPending = log.status === 'PENDING_PEDIDO';

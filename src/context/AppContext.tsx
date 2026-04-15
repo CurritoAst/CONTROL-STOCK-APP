@@ -21,6 +21,7 @@ interface AppContextType extends AppState {
     removeEvent: (id: string) => Promise<void>;
     refreshData: () => Promise<void>;
     updatePedidoItems: (logId: string, items: { product: Product, prepared: number }[]) => Promise<void>;
+    repairPendingStock: () => Promise<number>;
     isPushEnabled: boolean;
     requestPushPermission: () => Promise<boolean>;
 }
@@ -536,6 +537,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     };
 
+    const repairPendingStock = async (): Promise<number> => {
+        // Fetch all PENDING_PEDIDO log IDs
+        const { data: pendingLogs } = await supabase.from('daily_logs').select('id').eq('status', 'PENDING_PEDIDO');
+        if (!pendingLogs || pendingLogs.length === 0) return 0;
+
+        const pendingIds = pendingLogs.map((l: any) => l.id);
+
+        // Fetch all items from those logs
+        const { data: pendingItems } = await supabase.from('log_items').select('product_id, prepared').in('daily_log_id', pendingIds);
+        if (!pendingItems || pendingItems.length === 0) return 0;
+
+        // Sum prepared per product
+        const toRestore: Record<string, number> = {};
+        for (const item of pendingItems) {
+            toRestore[item.product_id] = (toRestore[item.product_id] || 0) + item.prepared;
+        }
+
+        let fixed = 0;
+        for (const [productId, amount] of Object.entries(toRestore)) {
+            const { data: fresh } = await supabase.from('products').select('stock').eq('id', productId).single();
+            if (fresh) {
+                await supabase.from('products').update({ stock: fresh.stock + amount }).eq('id', productId);
+                fixed++;
+            }
+        }
+
+        await refreshData();
+        return fixed;
+    };
+
     const removeEvent = async (id: string) => {
         const { error } = await supabase.from('events').delete().eq('id', id);
 
@@ -566,6 +597,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             removeEvent,
             refreshData,
             updatePedidoItems,
+            repairPendingStock,
             isPushEnabled,
             requestPushPermission
         }}>
