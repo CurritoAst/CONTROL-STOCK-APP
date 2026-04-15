@@ -33,6 +33,7 @@ export const DailyAudit: React.FC = () => {
     const [editingItems, setEditingItems] = useState<{ product: any, prepared: number }[]>([]);
     const [editCategory, setEditCategory] = useState<string>("");
     const [isSaving, setIsSaving] = useState(false);
+    const [approvingId, setApprovingId] = useState<string | null>(null);
 
     if (logsToAudit.length === 0) {
         return (
@@ -220,21 +221,34 @@ export const DailyAudit: React.FC = () => {
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6">
                                     <button
                                         className="btn btn-outline border-accent-red text-accent-red hover:bg-accent-red hover:text-white flex-1 text-lg py-4"
-                                        onClick={() => {
-                                            rejectPedido(log.id);
-                                            addToast(`Pedido para ${log.date} rechazado.`, "error");
+                                        disabled={approvingId === log.id}
+                                        onClick={async () => {
+                                            try {
+                                                await rejectPedido(log.id);
+                                                addToast(`Pedido para ${log.date} rechazado.`, "error");
+                                            } catch (e: any) {
+                                                addToast('Error al rechazar: ' + (e.message || 'inténtalo de nuevo'), 'error');
+                                            }
                                         }}
                                     >
                                         ❌ Rechazar
                                     </button>
                                     <button
-                                        className="btn btn-primary flex-2 w-full sm:w-2/3 text-lg py-4 shadow-lg shadow-accent-blue/20"
-                                        onClick={() => {
-                                            approvePedido(log.id);
-                                            addToast(`Pedido para ${log.date} aprobado.`, "success");
+                                        className="btn btn-primary flex-2 w-full sm:w-2/3 text-lg py-4 shadow-lg shadow-accent-blue/20 disabled:opacity-60"
+                                        disabled={approvingId === log.id}
+                                        onClick={async () => {
+                                            setApprovingId(log.id);
+                                            try {
+                                                await approvePedido(log.id);
+                                                addToast(`Pedido para ${log.date} aprobado.`, "success");
+                                            } catch (e: any) {
+                                                addToast('Error al aprobar: ' + (e.message || 'inténtalo de nuevo'), 'error');
+                                            } finally {
+                                                setApprovingId(null);
+                                            }
                                         }}
                                     >
-                                        ✅ Aprobar Pedido para el día {log.date}
+                                        {approvingId === log.id ? '⏳ Aprobando...' : '✅ Aprobar Pedido para el día ' + log.date}
                                     </button>
                                 </div>
                             )}
