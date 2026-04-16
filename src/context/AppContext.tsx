@@ -22,6 +22,7 @@ interface AppContextType extends AppState {
     refreshData: () => Promise<void>;
     updatePedidoItems: (logId: string, items: { product: Product, prepared: number }[]) => Promise<void>;
     repairPendingStock: () => Promise<number>;
+    duplicateDailyLog: (sourceLogId: string, newDate: string) => Promise<void>;
     isPushEnabled: boolean;
     requestPushPermission: () => Promise<boolean>;
 }
@@ -567,6 +568,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return fixed;
     };
 
+    const duplicateDailyLog = async (sourceLogId: string, newDate: string): Promise<void> => {
+        const sourceLog = state.activeLogs.find(l => l.id === sourceLogId)
+            || state.historicalLogs.find(l => l.id === sourceLogId);
+        if (!sourceLog) throw new Error('Pedido origen no encontrado');
+
+        const items: InventoryItem[] = sourceLog.items
+            .filter(i => i.prepared > 0)
+            .map(i => ({
+                product: i.product,
+                prepared: i.prepared,
+                consumed: 0
+            }));
+
+        if (items.length === 0) throw new Error('El pedido origen no tiene productos');
+        await openDailyLog(newDate, items, sourceLog.eventTitle);
+    };
+
     const removeEvent = async (id: string) => {
         const { error } = await supabase.from('events').delete().eq('id', id);
 
@@ -598,6 +616,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             refreshData,
             updatePedidoItems,
             repairPendingStock,
+            duplicateDailyLog,
             isPushEnabled,
             requestPushPermission
         }}>

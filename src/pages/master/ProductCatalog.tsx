@@ -3,6 +3,8 @@ import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { Product } from '../../types';
 
+const LOW_STOCK = 5;
+
 export const ProductCatalog: React.FC = () => {
     const { products, categories, addCategory, removeCategory, addProduct, updateProduct, deleteProduct } = useAppContext();
     const { addToast } = useToast();
@@ -13,15 +15,30 @@ export const ProductCatalog: React.FC = () => {
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [search, setSearch] = useState('');
+    const [sortBy, setSortBy] = useState<'name' | 'stock_asc' | 'stock_desc'>('name');
+    const [quickEdit, setQuickEdit] = useState<{ id: string; val: string } | null>(null);
+    const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
 
-    // Combinamos las declaradas globalmente y las que puedan existir en productos antiguos
     const allCategories = Array.from(new Set([
-        'General', // General siempre debe estar primero y ser la opción por defecto para ver todo
+        'General',
         ...(categories || []).filter(c => c !== 'General'),
         ...products.map(p => p.category || 'General').filter(c => c !== 'General')
     ]));
 
     const isEditing = editingId === 'new' || editingId !== null;
+
+    const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= LOW_STOCK);
+    const zeroStockProducts = products.filter(p => p.stock === 0);
+
+    const saveQuickStock = async (product: Product) => {
+        if (!quickEdit) return;
+        const newStock = Math.max(0, parseInt(quickEdit.val, 10) || 0);
+        setQuickEdit(null);
+        if (newStock !== product.stock) {
+            await updateProduct({ ...product, stock: newStock });
+            addToast(`${product.name}: stock ${product.stock} → ${newStock}`, 'success');
+        }
+    };
 
     const handleEdit = (product: Product) => {
         setEditingId(product.id);
@@ -38,80 +55,43 @@ export const ProductCatalog: React.FC = () => {
             addToast("Nombre y precio son obligatorios", "error");
             return;
         }
-
         if (editingId === 'new') {
-            addProduct({
-                id: `p${Date.now()}`,
-                name: formData.name,
-                price: Number(formData.price),
-                category: formData.category || 'General',
-                stock: Number(formData.stock) || 0
-            });
+            addProduct({ id: `p${Date.now()}`, name: formData.name, price: Number(formData.price), category: formData.category || 'General', stock: Number(formData.stock) || 0 });
             addToast("Producto creado correctamente", "success");
         } else {
             updateProduct(formData as Product);
             addToast("Producto actualizado", "success");
         }
-
         setEditingId(null);
     };
 
     const handleDelete = (id: string) => {
         const product = products.find(p => p.id === id);
-        if (product) {
-            setItemToDelete({ id, type: 'product', name: product.name });
-        }
+        if (product) setItemToDelete({ id, type: 'product', name: product.name });
     };
 
     if (isEditing) {
         return (
             <div className="card max-w-lg mx-auto">
                 <h3 className="text-xl mb-4 font-bold">{editingId === 'new' ? 'Nuevo Producto' : 'Editar Producto'}</h3>
-
                 <div className="input-group">
                     <label>Nombre del Producto</label>
-                    <input
-                        type="text"
-                        value={formData.name || ''}
-                        onChange={e => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Ej. Entrecot"
-                    />
+                    <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Ej. Entrecot" />
                 </div>
-
                 <div className="input-group">
                     <label>Precio / Coste Unitario (€)</label>
-                    <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.price || ''}
-                        onChange={e => setFormData({ ...formData, price: Number(e.target.value) })}
-                    />
+                    <input type="number" min="0" step="0.01" value={formData.price || ''} onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} />
                 </div>
-
                 <div className="input-group mb-6">
                     <label>Categoría</label>
-                    <select
-                        value={formData.category || 'General'}
-                        onChange={e => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue"
-                    >
-                        {allCategories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                        ))}
+                    <select value={formData.category || 'General'} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue">
+                        {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                 </div>
-
                 <div className="input-group mb-6">
                     <label>Stock Total (Almacén)</label>
-                    <input
-                        type="number"
-                        min="0"
-                        value={formData.stock === undefined ? '' : formData.stock}
-                        onChange={e => setFormData({ ...formData, stock: Number(e.target.value) })}
-                    />
+                    <input type="number" min="0" value={formData.stock === undefined ? '' : formData.stock} onChange={e => setFormData({ ...formData, stock: Number(e.target.value) })} />
                 </div>
-
                 <div className="flex gap-md">
                     <button className="btn btn-outline w-full" onClick={() => setEditingId(null)}>Cancelar</button>
                     <button className="btn btn-success w-full" onClick={handleSave}>Guardar</button>
@@ -122,33 +102,25 @@ export const ProductCatalog: React.FC = () => {
 
     const filteredProducts = products.filter(p =>
         (selectedCategory === 'General' || (p.category || 'General') === selectedCategory) &&
-        (search === '' || p.name.toLowerCase().includes(search.toLowerCase()))
+        (search === '' || p.name.toLowerCase().includes(search.toLowerCase())) &&
+        (!showOnlyLowStock || p.stock <= LOW_STOCK)
     );
 
-    const handleAddCategoryClick = () => {
-        setNewCategoryName('');
-        setIsAddingCategory(true);
-    };
+    const sortedProducts = [...filteredProducts].sort((a, b) => {
+        if (sortBy === 'stock_asc') return a.stock - b.stock;
+        if (sortBy === 'stock_desc') return b.stock - a.stock;
+        return a.name.localeCompare(b.name);
+    });
 
-    const confirmAddCategory = () => {
-        if (newCategoryName.trim()) {
-            addCategory(newCategoryName.trim());
-            addToast("Sección añadida a la lista", "success");
-            setIsAddingCategory(false);
-            setSelectedCategory(newCategoryName.trim());
-        } else {
-            addToast("El nombre no puede estar vacío", "error");
-        }
-    };
-
-    const handleDeleteCategory = () => {
-        if (selectedCategory === 'General') return;
-        setItemToDelete({ type: 'category', name: selectedCategory });
-    };
+    const groupedByCategory = sortedProducts.reduce((acc, product) => {
+        const cat = product.category || 'General';
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(product);
+        return acc;
+    }, {} as Record<string, Product[]>);
 
     const confirmDelete = async () => {
         if (!itemToDelete) return;
-
         if (itemToDelete.type === 'product' && itemToDelete.id) {
             await deleteProduct(itemToDelete.id);
             addToast("Producto eliminado correctamente", "info");
@@ -163,6 +135,7 @@ export const ProductCatalog: React.FC = () => {
     return (
         <>
             <div className="card">
+                {/* Header */}
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
                     <h2 className="text-2xl mb-1">Catálogo de Productos y Costes</h2>
                     <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
@@ -176,31 +149,59 @@ export const ProductCatalog: React.FC = () => {
                         <div className="flex flex-wrap w-full sm:w-auto gap-2 items-center">
                             <select
                                 value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                onChange={e => setSelectedCategory(e.target.value)}
                                 className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-auto"
                             >
-                                {allCategories.map(cat => (
-                                    <option key={cat} value={cat}>{cat === 'General' ? 'Todas (General)' : cat}</option>
-                                ))}
+                                {allCategories.map(cat => <option key={cat} value={cat}>{cat === 'General' ? 'Todas (General)' : cat}</option>)}
                             </select>
-                            <button className="btn btn-outline" title="Añadir nueva sección" onClick={handleAddCategoryClick}>+</button>
+                            <select
+                                value={sortBy}
+                                onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                                className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue text-sm"
+                                title="Ordenar por"
+                            >
+                                <option value="name">A–Z</option>
+                                <option value="stock_asc">Stock ↑</option>
+                                <option value="stock_desc">Stock ↓</option>
+                            </select>
+                            <button className="btn btn-outline" title="Añadir nueva sección" onClick={() => { setNewCategoryName(''); setIsAddingCategory(true); }}>+</button>
                             {selectedCategory !== 'General' &&
-                                <button className="btn btn-outline text-accent-red border-accent-red/50 hover:bg-accent-red/10" title="Eliminar esta sección" onClick={handleDeleteCategory}>🗑️</button>
+                                <button className="btn btn-outline text-accent-red border-accent-red/50 hover:bg-accent-red/10" title="Eliminar esta sección" onClick={() => setItemToDelete({ type: 'category', name: selectedCategory })}>🗑️</button>
                             }
-                            <button className="btn btn-primary whitespace-nowrap" onClick={handeNew}>+ Añadir Producto</button>
+                            <button className="btn btn-primary whitespace-nowrap" onClick={handeNew}>+ Añadir</button>
                         </div>
                     </div>
                 </div>
 
+                {/* Alertas de stock */}
+                {(lowStockProducts.length > 0 || zeroStockProducts.length > 0) && (
+                    <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                                <p className="font-bold text-yellow-400 mb-1">Alerta de Stock</p>
+                                <div className="flex flex-wrap gap-3 text-sm">
+                                    {zeroStockProducts.length > 0 && (
+                                        <span className="text-accent-red font-semibold">{zeroStockProducts.length} sin stock</span>
+                                    )}
+                                    {lowStockProducts.length > 0 && (
+                                        <span className="text-yellow-400">{lowStockProducts.length} con stock crítico (≤{LOW_STOCK})</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setShowOnlyLowStock(s => !s)}
+                            className={`btn text-sm shrink-0 ${showOnlyLowStock ? 'btn-primary' : 'btn-outline border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10'}`}
+                        >
+                            {showOnlyLowStock ? 'Ver todos' : 'Ver críticos'}
+                        </button>
+                    </div>
+                )}
+
+                {/* Product list */}
                 <div className="space-y-12">
-                    {Object.entries(
-                        filteredProducts.reduce((acc, product) => {
-                            const cat = product.category || 'General';
-                            if (!acc[cat]) acc[cat] = [];
-                            acc[cat].push(product);
-                            return acc;
-                        }, {} as Record<string, Product[]>)
-                    ).map(([category, items]) => (
+                    {Object.entries(groupedByCategory).map(([category, items]) => (
                         <div key={category} className="animate-fade-in">
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="flex items-baseline gap-2 whitespace-nowrap">
@@ -210,42 +211,86 @@ export const ProductCatalog: React.FC = () => {
                                 <div className="h-px w-full bg-gradient-to-r from-accent-blue/40 to-transparent"></div>
                             </div>
                             <div className="grid gap-3">
-                                {items.map(product => (
-                                    <div key={product.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl gap-4 hover:border-white/10 transition-all hover:bg-black/60 group shadow-lg">
-                                        <div className="flex-1">
-                                            <div className="font-black text-lg tracking-tight mb-1 group-hover:text-accent-blue transition-colors">{product.name}</div>
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="badge badge-gray text-[9px]">{product.category}</span>
-                                                <span className={`badge ${product.stock > 0 ? 'badge-green' : 'badge-red'} text-[9px]`}>
-                                                    STOCK: {product.stock}
-                                                </span>
-                                                {product.reserved ? (
-                                                    <span className={`badge ${product.stock - product.reserved > 0 ? 'badge-blue' : 'badge-red'} text-[9px]`}>
-                                                        LIBRE: {product.stock - product.reserved}
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-white/5">
-                                            <div className="text-right">
-                                                <div className="text-2xl font-black italic tracking-tighter">
-                                                    {product.price.toLocaleString('es-ES')} <span className="text-xs text-text-muted not-italic">€</span>
+                                {items.map(product => {
+                                    const isLow = product.stock > 0 && product.stock <= LOW_STOCK;
+                                    const isZero = product.stock === 0;
+                                    return (
+                                        <div
+                                            key={product.id}
+                                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-2xl gap-4 transition-all group shadow-lg
+                                                ${isZero ? 'border-accent-red/30 bg-accent-red/5 hover:border-accent-red/50' :
+                                                  isLow ? 'border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/50' :
+                                                  'border-white/5 bg-black/40 hover:border-white/10 hover:bg-black/60'}`}
+                                        >
+                                            <div className="flex-1">
+                                                <div className={`font-black text-lg tracking-tight mb-1 group-hover:text-accent-blue transition-colors ${isZero ? 'text-accent-red/80' : isLow ? 'text-yellow-400' : ''}`}>
+                                                    {product.name}
                                                 </div>
-                                                <div className="text-[9px] font-black uppercase text-accent-blue tracking-widest">P. Unitario</div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="badge badge-gray text-[9px]">{product.category}</span>
+
+                                                    {/* Stock badge — clickable para edición rápida */}
+                                                    {quickEdit?.id === product.id ? (
+                                                        <input
+                                                            autoFocus
+                                                            type="number"
+                                                            min="0"
+                                                            className="w-20 text-center text-xs font-bold p-1 rounded border border-accent-blue bg-accent-blue/10 text-accent-blue outline-none"
+                                                            value={quickEdit.val}
+                                                            onChange={e => setQuickEdit({ id: product.id, val: e.target.value })}
+                                                            onBlur={() => saveQuickStock(product)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') saveQuickStock(product);
+                                                                if (e.key === 'Escape') setQuickEdit(null);
+                                                            }}
+                                                            onClick={e => e.stopPropagation()}
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className={`badge cursor-pointer select-none text-[9px] transition-opacity hover:opacity-70 ${
+                                                                isZero ? 'badge-red' :
+                                                                isLow ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                                                                'badge-green'
+                                                            }`}
+                                                            title="Clic para editar stock"
+                                                            onClick={e => { e.stopPropagation(); setQuickEdit({ id: product.id, val: String(product.stock) }); }}
+                                                        >
+                                                            {isZero ? '❌ ' : isLow ? '⚠️ ' : ''}STOCK: {product.stock} ✏️
+                                                        </span>
+                                                    )}
+
+                                                    {product.reserved ? (
+                                                        <span className={`badge ${product.stock - product.reserved > 0 ? 'badge-blue' : 'badge-red'} text-[9px]`}>
+                                                            LIBRE: {product.stock - product.reserved}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <button className="w-10 h-10 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-lg transition-all" title="Editar" onClick={() => handleEdit(product)}>✏️</button>
-                                                <button className="w-10 h-10 flex items-center justify-center bg-accent-red/10 border border-accent-red/20 rounded-xl hover:bg-accent-red/20 text-lg transition-all" title="Eliminar" onClick={() => handleDelete(product.id)}>🗑️</button>
+                                            <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                                                <div className="text-right">
+                                                    <div className="text-2xl font-black italic tracking-tighter">
+                                                        {product.price.toLocaleString('es-ES')} <span className="text-xs text-text-muted not-italic">€</span>
+                                                    </div>
+                                                    <div className="text-[9px] font-black uppercase text-accent-blue tracking-widest">P. Unitario</div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button className="w-10 h-10 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-lg transition-all" title="Editar" onClick={() => handleEdit(product)}>✏️</button>
+                                                    <button className="w-10 h-10 flex items-center justify-center bg-accent-red/10 border border-accent-red/20 rounded-xl hover:bg-accent-red/20 text-lg transition-all" title="Eliminar" onClick={() => handleDelete(product.id)}>🗑️</button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}
+                    {Object.keys(groupedByCategory).length === 0 && (
+                        <div className="text-center py-10 text-text-muted">No hay productos que coincidan con los filtros.</div>
+                    )}
                 </div>
             </div>
 
+            {/* Delete confirm modal */}
             {itemToDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-bg-primary p-6 rounded-lg border border-white/10 max-w-md w-full shadow-2xl">
@@ -253,39 +298,43 @@ export const ProductCatalog: React.FC = () => {
                         <p className="mb-6 text-white/90 leading-relaxed">
                             {itemToDelete.type === 'product'
                                 ? `¿Estás seguro de que deseas eliminar el producto "${itemToDelete.name}"? Esta acción no se puede deshacer.`
-                                : `¿Estás seguro de que deseas eliminar la sección "${itemToDelete.name}"? Todos los productos que formaban parte de esta sección pasarán a ser etiquetados como "General".`}
+                                : `¿Estás seguro de que deseas eliminar la sección "${itemToDelete.name}"? Todos los productos pasarán a "General".`}
                         </p>
                         <div className="flex gap-4 justify-end">
                             <button className="btn btn-outline" onClick={() => setItemToDelete(null)}>Cancelar</button>
-                            <button className="btn btn-success bg-accent-red border-accent-red text-white hover:bg-accent-red/80" onClick={confirmDelete}>
-                                Eliminar
-                            </button>
+                            <button className="btn btn-success bg-accent-red border-accent-red text-white hover:bg-accent-red/80" onClick={confirmDelete}>Eliminar</button>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* Add category modal */}
             {isAddingCategory && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-bg-primary p-6 rounded-lg border border-white/10 max-w-md w-full shadow-2xl">
                         <h3 className="text-xl font-bold mb-4 text-accent-blue">Añadir nueva sección</h3>
-                        <p className="mb-4 text-white/80 text-sm">
-                            Introduce el nombre de la nueva categoría para organizar tus productos.
-                        </p>
                         <div className="input-group mb-6">
                             <input
                                 type="text"
                                 autoFocus
                                 value={newCategoryName}
-                                onChange={(e) => setNewCategoryName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && confirmAddCategory()}
+                                onChange={e => setNewCategoryName(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        if (newCategoryName.trim()) { addCategory(newCategoryName.trim()); addToast("Sección añadida", "success"); setIsAddingCategory(false); setSelectedCategory(newCategoryName.trim()); }
+                                        else addToast("El nombre no puede estar vacío", "error");
+                                    }
+                                }}
                                 placeholder="Ej. Congelados..."
                                 className="w-full bg-black/30 border border-white/20 rounded p-3 text-white outline-none focus:border-accent-blue"
                             />
                         </div>
                         <div className="flex gap-4 justify-end">
                             <button className="btn btn-outline" onClick={() => setIsAddingCategory(false)}>Cancelar</button>
-                            <button className="btn btn-primary" onClick={confirmAddCategory}>Guardar</button>
+                            <button className="btn btn-primary" onClick={() => {
+                                if (newCategoryName.trim()) { addCategory(newCategoryName.trim()); addToast("Sección añadida", "success"); setIsAddingCategory(false); setSelectedCategory(newCategoryName.trim()); }
+                                else addToast("El nombre no puede estar vacío", "error");
+                            }}>Guardar</button>
                         </div>
                     </div>
                 </div>

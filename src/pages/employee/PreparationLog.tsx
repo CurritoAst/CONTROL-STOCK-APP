@@ -12,8 +12,16 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
     const [selectedCategory, setSelectedCategory] = useState<string>('General');
     const [isSaving, setIsSaving] = useState(false);
 
+    const LOW_STOCK = 5;
+
     const allCategories = ['General', ...Array.from(new Set(products.map(p => p.category || 'General').filter(c => c !== 'General')))];
     const filteredProducts = products.filter(p => selectedCategory === 'General' || (p.category || 'General') === selectedCategory);
+
+    const lowStockCount = products.filter(p => {
+        const avail = p.stock - (p.reserved || 0);
+        return avail > 0 && avail <= LOW_STOCK;
+    }).length;
+    const outOfStockCount = products.filter(p => (p.stock - (p.reserved || 0)) <= 0).length;
 
     const selectedItems = products.filter(p => (quantities[p.id] || 0) > 0);
     const totalUnits = selectedItems.reduce((sum, p) => sum + (quantities[p.id] || 0), 0);
@@ -76,6 +84,24 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
                 </div>
             </div>
 
+            {/* Low stock / out of stock warnings */}
+            {(lowStockCount > 0 || outOfStockCount > 0) && (
+                <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                    {outOfStockCount > 0 && (
+                        <div className="flex-1 bg-accent-red/10 border border-accent-red/20 rounded-xl px-4 py-3 flex items-center gap-2 text-sm">
+                            <span className="text-lg">❌</span>
+                            <span className="text-accent-red font-semibold">{outOfStockCount} producto{outOfStockCount !== 1 ? 's' : ''} sin stock</span>
+                        </div>
+                    )}
+                    {lowStockCount > 0 && (
+                        <div className="flex-1 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 flex items-center gap-2 text-sm">
+                            <span className="text-lg">⚠️</span>
+                            <span className="text-yellow-400 font-semibold">{lowStockCount} producto{lowStockCount !== 1 ? 's' : ''} con stock crítico (≤{LOW_STOCK})</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Products — same row layout as master catalog */}
             <div className="card mb-4">
                 <div className="space-y-1">
@@ -85,21 +111,22 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
                     {filteredProducts.map((product, idx) => {
                         const availableStock = product.stock - (product.reserved || 0);
                         const isOutOfStock = availableStock <= 0;
+                        const isLowStock = !isOutOfStock && availableStock <= LOW_STOCK;
                         const qty = quantities[product.id] || 0;
                         return (
                             <div
                                 key={product.id}
                                 className={`flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-4 transition-colors
                                     ${idx < filteredProducts.length - 1 ? 'mb-2' : ''}
-                                    ${isOutOfStock ? 'border-accent-red/20 bg-bg-primary/20 opacity-60' : qty > 0 ? 'border-accent-blue/40 bg-accent-blue/5' : 'border-white/10 bg-bg-primary/50'}`}
+                                    ${isOutOfStock ? 'border-accent-red/20 bg-bg-primary/20 opacity-60' : qty > 0 ? 'border-accent-blue/40 bg-accent-blue/5' : isLowStock ? 'border-yellow-500/20 bg-yellow-500/5' : 'border-white/10 bg-bg-primary/50'}`}
                             >
                                 {/* Product info */}
                                 <div>
                                     <div className={`font-bold text-lg mb-1 ${isOutOfStock ? 'text-accent-red/70' : ''}`}>{product.name}</div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="badge badge-gray">{product.category || 'General'}</span>
-                                        <span className={`badge ${availableStock > 0 ? 'badge-green' : 'bg-accent-red/20 text-accent-red'}`}>
-                                            Disp: {availableStock}
+                                        <span className={`badge ${isOutOfStock ? 'bg-accent-red/20 text-accent-red' : isLowStock ? 'bg-yellow-500/20 text-yellow-400' : 'badge-green'}`}>
+                                            {isLowStock && '⚠️ '}Disp: {availableStock}
                                         </span>
                                         {qty > 0 && <span className="badge badge-blue">Pedido: {qty}</span>}
                                     </div>

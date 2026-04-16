@@ -10,7 +10,7 @@ import { printRawOrder } from '../../lib/printUtils';
 
 
 export const DailyAudit: React.FC = () => {
-    const { activeLogs, products, approveDailyLog, approvePedido, rejectPedido, deleteDailyLog, updatePedidoItems, repairPendingStock } = useAppContext();
+    const { activeLogs, products, approveDailyLog, approvePedido, rejectPedido, deleteDailyLog, updatePedidoItems, repairPendingStock, duplicateDailyLog } = useAppContext();
     const { addToast } = useToast();
     const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
@@ -35,6 +35,11 @@ export const DailyAudit: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [approvingId, setApprovingId] = useState<string | null>(null);
     const [isRepairing, setIsRepairing] = useState(false);
+    const [rejectModal, setRejectModal] = useState<{ logId: string; date: string } | null>(null);
+    const [rejectReason, setRejectReason] = useState('');
+    const [duplicateModal, setDuplicateModal] = useState<{ logId: string; sourceDate: string } | null>(null);
+    const [duplicateDate, setDuplicateDate] = useState('');
+    const [isDuplicating, setIsDuplicating] = useState(false);
 
     if (logsToAudit.length === 0) {
         return (
@@ -105,6 +110,7 @@ export const DailyAudit: React.FC = () => {
     const hasPending = logsToAudit.some(l => l.status === 'PENDING_PEDIDO');
 
     return (
+        <>
         <div className="flex flex-col gap-6">
             {hasPending && (
                 <div className="bg-accent-red/10 border border-accent-red/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -133,7 +139,7 @@ export const DailyAudit: React.FC = () => {
                                     <h2 className="text-2xl mb-1">Pedido Diario {log.eventTitle ? `- ${log.eventTitle}` : ''}</h2>
                                     <p className="text-text-muted">Día de servicio: {log.date}</p>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 flex-wrap justify-end">
                                     {!isPending && (
                                         <>
                                             <button
@@ -151,6 +157,13 @@ export const DailyAudit: React.FC = () => {
                                             </button>
                                         </>
                                     )}
+                                    <button
+                                        className="btn btn-outline border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10 text-xs py-1 px-2"
+                                        onClick={() => { setDuplicateDate(''); setDuplicateModal({ logId: log.id, sourceDate: log.date }); }}
+                                        title="Copiar este pedido a otra fecha"
+                                    >
+                                        📋 Duplicar
+                                    </button>
                                     <button
                                         className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 text-xs py-1 px-2"
                                         onClick={() => {
@@ -253,14 +266,7 @@ export const DailyAudit: React.FC = () => {
                                     <button
                                         className="btn btn-outline border-accent-red text-accent-red hover:bg-accent-red hover:text-white flex-1 text-lg py-4"
                                         disabled={approvingId === log.id}
-                                        onClick={async () => {
-                                            try {
-                                                await rejectPedido(log.id);
-                                                addToast(`Pedido para ${log.date} rechazado.`, "error");
-                                            } catch (e: any) {
-                                                addToast('Error al rechazar: ' + (e.message || 'inténtalo de nuevo'), 'error');
-                                            }
-                                        }}
+                                        onClick={() => { setRejectReason(''); setRejectModal({ logId: log.id, date: log.date }); }}
                                     >
                                         ❌ Rechazar
                                     </button>
@@ -367,5 +373,100 @@ export const DailyAudit: React.FC = () => {
                 return null;
             })}
         </div>
+
+            {/* Duplicate order modal */}
+            {duplicateModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-bg-elevated border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+                        <h3 className="text-xl font-bold">📋 Duplicar Pedido</h3>
+                        <p className="text-text-muted text-sm">
+                            Copia todos los productos del pedido del <strong className="text-white">{duplicateModal.sourceDate}</strong> a una nueva fecha.
+                        </p>
+                        <input
+                            type="date"
+                            autoFocus
+                            value={duplicateDate}
+                            onChange={e => setDuplicateDate(e.target.value)}
+                            className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-3 text-white outline-none focus:border-accent-blue text-sm"
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                className="btn btn-outline flex-1"
+                                onClick={() => setDuplicateModal(null)}
+                                disabled={isDuplicating}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn btn-primary flex-1 disabled:opacity-50"
+                                disabled={!duplicateDate || isDuplicating}
+                                onClick={async () => {
+                                    if (!duplicateModal || !duplicateDate) return;
+                                    setIsDuplicating(true);
+                                    try {
+                                        await duplicateDailyLog(duplicateModal.logId, duplicateDate);
+                                        addToast(`Pedido duplicado para el ${duplicateDate}`, 'success');
+                                        setDuplicateModal(null);
+                                    } catch (e: any) {
+                                        addToast('Error al duplicar: ' + (e.message || 'inténtalo de nuevo'), 'error');
+                                    } finally {
+                                        setIsDuplicating(false);
+                                    }
+                                }}
+                            >
+                                {isDuplicating ? '⏳ Duplicando...' : '📋 Duplicar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject reason modal */}
+            {rejectModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-bg-elevated border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+                        <h3 className="text-xl font-bold">❌ Rechazar Pedido</h3>
+                        <p className="text-text-muted text-sm">
+                            Pedido del <strong className="text-white">{rejectModal.date}</strong>. Puedes añadir un motivo de rechazo para que la cocina lo vea en la notificación.
+                        </p>
+                        <textarea
+                            autoFocus
+                            className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-3 text-white outline-none focus:border-accent-red resize-none text-sm"
+                            rows={3}
+                            placeholder="Motivo del rechazo (opcional)..."
+                            value={rejectReason}
+                            onChange={e => setRejectReason(e.target.value)}
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                className="btn btn-outline flex-1"
+                                onClick={() => setRejectModal(null)}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn btn-outline border-accent-red text-accent-red hover:bg-accent-red hover:text-white flex-1"
+                                onClick={async () => {
+                                    if (!rejectModal) return;
+                                    const { logId, date } = rejectModal;
+                                    setRejectModal(null);
+                                    try {
+                                        await rejectPedido(logId);
+                                        const msg = rejectReason.trim()
+                                            ? `Pedido de ${date} rechazado: "${rejectReason.trim()}"`
+                                            : `Pedido para ${date} rechazado.`;
+                                        addToast(msg, 'error');
+                                    } catch (e: any) {
+                                        addToast('Error al rechazar: ' + (e.message || 'inténtalo de nuevo'), 'error');
+                                    }
+                                }}
+                            >
+                                Confirmar Rechazo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 };

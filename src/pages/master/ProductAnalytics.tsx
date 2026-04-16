@@ -4,16 +4,24 @@ import { useAppContext } from '../../context/AppContext';
 export const ProductAnalytics: React.FC = () => {
     const { products, historicalLogs } = useAppContext();
     const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
 
     // Calculate analytics dataset
     // Calculate analytics dataset and group by category
     const groupedAnalytics = useMemo(() => {
+        const filteredLogs = historicalLogs.filter(log => {
+            if (dateFrom && log.date < dateFrom) return false;
+            if (dateTo && log.date > dateTo) return false;
+            return true;
+        });
+
         const stats = products.map(product => {
             let totalPrepared = 0;
             let totalConsumed = 0;
             let costGenerated = 0;
 
-            historicalLogs.forEach(log => {
+            filteredLogs.forEach(log => {
                 const item = log.items.find(i => i.product.id === product.id);
                 if (item) {
                     totalPrepared += item.prepared;
@@ -42,7 +50,7 @@ export const ProductAnalytics: React.FC = () => {
             acc[cat].push(stat);
             return acc;
         }, {} as Record<string, typeof stats>);
-    }, [products, historicalLogs]);
+    }, [products, historicalLogs, dateFrom, dateTo]);
 
     const categories = Object.keys(groupedAnalytics).sort((a, b) => {
         if (a === 'General') return -1;
@@ -62,17 +70,41 @@ export const ProductAnalytics: React.FC = () => {
                         <h2 className="text-2xl mb-2">📈 Análisis de Trazabilidad por Producto</h2>
                         <p className="text-text-secondary">Consulta el histórico acumulado de preparación, desgaste y pérdidas físicas por sección.</p>
                     </div>
-                    <div className="w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         <select
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-64"
+                            className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-48"
                         >
                             <option value="Todas">Todas las secciones</option>
                             {categories.map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
                         </select>
+                        <div className="flex gap-2 items-center">
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                onChange={e => setDateFrom(e.target.value)}
+                                className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue text-sm w-full sm:w-auto"
+                                title="Desde"
+                            />
+                            <span className="text-text-muted shrink-0">—</span>
+                            <input
+                                type="date"
+                                value={dateTo}
+                                onChange={e => setDateTo(e.target.value)}
+                                className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue text-sm w-full sm:w-auto"
+                                title="Hasta"
+                            />
+                            {(dateFrom || dateTo) && (
+                                <button
+                                    className="text-text-muted hover:text-white text-sm shrink-0 transition-colors"
+                                    onClick={() => { setDateFrom(''); setDateTo(''); }}
+                                    title="Limpiar fechas"
+                                >✕</button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
