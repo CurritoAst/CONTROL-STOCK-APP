@@ -1,9 +1,100 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { Product } from '../../types';
 
 const LOW_STOCK = 5;
+
+// ─── Product row memoized — only re-renders when its own data or quickEdit changes ───
+const ProductRow = memo(({
+    product,
+    isQuickEditing,
+    quickEditVal,
+    onQuickEditStart,
+    onQuickEditChange,
+    onQuickEditSave,
+    onQuickEditCancel,
+    onEdit,
+    onDelete,
+}: {
+    product: Product;
+    isQuickEditing: boolean;
+    quickEditVal: string;
+    onQuickEditStart: () => void;
+    onQuickEditChange: (val: string) => void;
+    onQuickEditSave: () => void;
+    onQuickEditCancel: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+}) => {
+    const isLow = product.stock > 0 && product.stock <= LOW_STOCK;
+    const isZero = product.stock === 0;
+
+    return (
+        <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-2xl gap-4 transition-all group shadow-lg
+                ${isZero ? 'border-accent-red/30 bg-accent-red/5 hover:border-accent-red/50' :
+                  isLow ? 'border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/50' :
+                  'border-white/5 bg-black/40 hover:border-white/10 hover:bg-black/60'}`}
+        >
+            <div className="flex-1">
+                <div className={`font-black text-lg tracking-tight mb-1 group-hover:text-accent-blue transition-colors ${isZero ? 'text-accent-red/80' : isLow ? 'text-yellow-400' : ''}`}>
+                    {product.name}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="badge badge-gray text-[9px]">{product.category}</span>
+
+                    {isQuickEditing ? (
+                        <input
+                            autoFocus
+                            type="number"
+                            min="0"
+                            className="w-20 text-center text-xs font-bold p-1 rounded border border-accent-blue bg-accent-blue/10 text-accent-blue outline-none"
+                            value={quickEditVal}
+                            onChange={e => onQuickEditChange(e.target.value)}
+                            onBlur={onQuickEditSave}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') onQuickEditSave();
+                                if (e.key === 'Escape') onQuickEditCancel();
+                            }}
+                            onClick={e => e.stopPropagation()}
+                        />
+                    ) : (
+                        <span
+                            className={`badge cursor-pointer select-none text-[9px] transition-opacity hover:opacity-70 ${
+                                isZero ? 'badge-red' :
+                                isLow ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                                'badge-green'
+                            }`}
+                            title="Clic para editar stock"
+                            onClick={e => { e.stopPropagation(); onQuickEditStart(); }}
+                        >
+                            {isZero ? '❌ ' : isLow ? '⚠️ ' : ''}STOCK: {product.stock} ✏️
+                        </span>
+                    )}
+
+                    {product.reserved ? (
+                        <span className={`badge ${product.stock - product.reserved > 0 ? 'badge-blue' : 'badge-red'} text-[9px]`}>
+                            LIBRE: {product.stock - product.reserved}
+                        </span>
+                    ) : null}
+                </div>
+            </div>
+            <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                <div className="text-right">
+                    <div className="text-2xl font-black italic tracking-tighter">
+                        {product.price.toLocaleString('es-ES')} <span className="text-xs text-text-muted not-italic">€</span>
+                    </div>
+                    <div className="text-[9px] font-black uppercase text-accent-blue tracking-widest">P. Unitario</div>
+                </div>
+                <div className="flex gap-2">
+                    <button className="w-10 h-10 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-lg transition-all" title="Editar" onClick={onEdit}>✏️</button>
+                    <button className="w-10 h-10 flex items-center justify-center bg-accent-red/10 border border-accent-red/20 rounded-xl hover:bg-accent-red/20 text-lg transition-all" title="Eliminar" onClick={onDelete}>🗑️</button>
+                </div>
+            </div>
+        </div>
+    );
+});
 
 export const ProductCatalog: React.FC = () => {
     const { products, categories, addCategory, removeCategory, addProduct, updateProduct, deleteProduct } = useAppContext();
@@ -19,38 +110,39 @@ export const ProductCatalog: React.FC = () => {
     const [quickEdit, setQuickEdit] = useState<{ id: string; val: string } | null>(null);
     const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
 
-    const allCategories = Array.from(new Set([
+    const allCategories = useMemo(() => Array.from(new Set([
         'General',
         ...(categories || []).filter(c => c !== 'General'),
         ...products.map(p => p.category || 'General').filter(c => c !== 'General')
-    ]));
+    ])), [categories, products]);
 
     const isEditing = editingId === 'new' || editingId !== null;
 
-    const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= LOW_STOCK);
-    const zeroStockProducts = products.filter(p => p.stock === 0);
+    const { lowStockProducts, zeroStockProducts } = useMemo(() => ({
+        lowStockProducts: products.filter(p => p.stock > 0 && p.stock <= LOW_STOCK),
+        zeroStockProducts: products.filter(p => p.stock === 0),
+    }), [products]);
 
-    const saveQuickStock = async (product: Product) => {
-        if (!quickEdit) return;
-        const newStock = Math.max(0, parseInt(quickEdit.val, 10) || 0);
+    const saveQuickStock = useCallback(async (product: Product, val: string) => {
         setQuickEdit(null);
+        const newStock = Math.max(0, parseInt(val, 10) || 0);
         if (newStock !== product.stock) {
             await updateProduct({ ...product, stock: newStock });
             addToast(`${product.name}: stock ${product.stock} → ${newStock}`, 'success');
         }
-    };
+    }, [updateProduct, addToast]);
 
-    const handleEdit = (product: Product) => {
+    const handleEdit = useCallback((product: Product) => {
         setEditingId(product.id);
         setFormData(product);
-    };
+    }, []);
 
-    const handeNew = () => {
+    const handeNew = useCallback(() => {
         setEditingId('new');
         setFormData({ name: '', price: 0, category: 'General', stock: 0 });
-    };
+    }, []);
 
-    const handleSave = () => {
+    const handleSave = useCallback(() => {
         if (!formData.name || formData.price === undefined) {
             addToast("Nombre y precio son obligatorios", "error");
             return;
@@ -63,12 +155,46 @@ export const ProductCatalog: React.FC = () => {
             addToast("Producto actualizado", "success");
         }
         setEditingId(null);
-    };
+    }, [formData, editingId, addProduct, updateProduct, addToast]);
 
-    const handleDelete = (id: string) => {
+    const handleDelete = useCallback((id: string) => {
         const product = products.find(p => p.id === id);
         if (product) setItemToDelete({ id, type: 'product', name: product.name });
-    };
+    }, [products]);
+
+    const groupedByCategory = useMemo(() => {
+        const filtered = products.filter(p =>
+            (selectedCategory === 'General' || (p.category || 'General') === selectedCategory) &&
+            (search === '' || p.name.toLowerCase().includes(search.toLowerCase())) &&
+            (!showOnlyLowStock || p.stock <= LOW_STOCK)
+        );
+
+        const sorted = [...filtered].sort((a, b) => {
+            if (sortBy === 'stock_asc') return a.stock - b.stock;
+            if (sortBy === 'stock_desc') return b.stock - a.stock;
+            return a.name.localeCompare(b.name);
+        });
+
+        return sorted.reduce((acc, product) => {
+            const cat = product.category || 'General';
+            if (!acc[cat]) acc[cat] = [];
+            acc[cat].push(product);
+            return acc;
+        }, {} as Record<string, Product[]>);
+    }, [products, selectedCategory, search, showOnlyLowStock, sortBy]);
+
+    const confirmDelete = useCallback(async () => {
+        if (!itemToDelete) return;
+        if (itemToDelete.type === 'product' && itemToDelete.id) {
+            await deleteProduct(itemToDelete.id);
+            addToast("Producto eliminado correctamente", "info");
+        } else if (itemToDelete.type === 'category') {
+            await removeCategory(itemToDelete.name);
+            setSelectedCategory('General');
+            addToast("Sección eliminada de forma permanente", "info");
+        }
+        setItemToDelete(null);
+    }, [itemToDelete, deleteProduct, removeCategory, addToast]);
 
     if (isEditing) {
         return (
@@ -99,38 +225,6 @@ export const ProductCatalog: React.FC = () => {
             </div>
         );
     }
-
-    const filteredProducts = products.filter(p =>
-        (selectedCategory === 'General' || (p.category || 'General') === selectedCategory) &&
-        (search === '' || p.name.toLowerCase().includes(search.toLowerCase())) &&
-        (!showOnlyLowStock || p.stock <= LOW_STOCK)
-    );
-
-    const sortedProducts = [...filteredProducts].sort((a, b) => {
-        if (sortBy === 'stock_asc') return a.stock - b.stock;
-        if (sortBy === 'stock_desc') return b.stock - a.stock;
-        return a.name.localeCompare(b.name);
-    });
-
-    const groupedByCategory = sortedProducts.reduce((acc, product) => {
-        const cat = product.category || 'General';
-        if (!acc[cat]) acc[cat] = [];
-        acc[cat].push(product);
-        return acc;
-    }, {} as Record<string, Product[]>);
-
-    const confirmDelete = async () => {
-        if (!itemToDelete) return;
-        if (itemToDelete.type === 'product' && itemToDelete.id) {
-            await deleteProduct(itemToDelete.id);
-            addToast("Producto eliminado correctamente", "info");
-        } else if (itemToDelete.type === 'category') {
-            await removeCategory(itemToDelete.name);
-            setSelectedCategory('General');
-            addToast("Sección eliminada de forma permanente", "info");
-        }
-        setItemToDelete(null);
-    };
 
     return (
         <>
@@ -202,7 +296,7 @@ export const ProductCatalog: React.FC = () => {
                 {/* Product list */}
                 <div className="space-y-12">
                     {Object.entries(groupedByCategory).map(([category, items]) => (
-                        <div key={category} className="animate-fade-in">
+                        <div key={category}>
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="flex items-baseline gap-2 whitespace-nowrap">
                                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent-blue leading-none">{category}</h3>
@@ -211,76 +305,20 @@ export const ProductCatalog: React.FC = () => {
                                 <div className="h-px w-full bg-gradient-to-r from-accent-blue/40 to-transparent"></div>
                             </div>
                             <div className="grid gap-3">
-                                {items.map(product => {
-                                    const isLow = product.stock > 0 && product.stock <= LOW_STOCK;
-                                    const isZero = product.stock === 0;
-                                    return (
-                                        <div
-                                            key={product.id}
-                                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-2xl gap-4 transition-all group shadow-lg
-                                                ${isZero ? 'border-accent-red/30 bg-accent-red/5 hover:border-accent-red/50' :
-                                                  isLow ? 'border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/50' :
-                                                  'border-white/5 bg-black/40 hover:border-white/10 hover:bg-black/60'}`}
-                                        >
-                                            <div className="flex-1">
-                                                <div className={`font-black text-lg tracking-tight mb-1 group-hover:text-accent-blue transition-colors ${isZero ? 'text-accent-red/80' : isLow ? 'text-yellow-400' : ''}`}>
-                                                    {product.name}
-                                                </div>
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="badge badge-gray text-[9px]">{product.category}</span>
-
-                                                    {/* Stock badge — clickable para edición rápida */}
-                                                    {quickEdit?.id === product.id ? (
-                                                        <input
-                                                            autoFocus
-                                                            type="number"
-                                                            min="0"
-                                                            className="w-20 text-center text-xs font-bold p-1 rounded border border-accent-blue bg-accent-blue/10 text-accent-blue outline-none"
-                                                            value={quickEdit.val}
-                                                            onChange={e => setQuickEdit({ id: product.id, val: e.target.value })}
-                                                            onBlur={() => saveQuickStock(product)}
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter') saveQuickStock(product);
-                                                                if (e.key === 'Escape') setQuickEdit(null);
-                                                            }}
-                                                            onClick={e => e.stopPropagation()}
-                                                        />
-                                                    ) : (
-                                                        <span
-                                                            className={`badge cursor-pointer select-none text-[9px] transition-opacity hover:opacity-70 ${
-                                                                isZero ? 'badge-red' :
-                                                                isLow ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                                                                'badge-green'
-                                                            }`}
-                                                            title="Clic para editar stock"
-                                                            onClick={e => { e.stopPropagation(); setQuickEdit({ id: product.id, val: String(product.stock) }); }}
-                                                        >
-                                                            {isZero ? '❌ ' : isLow ? '⚠️ ' : ''}STOCK: {product.stock} ✏️
-                                                        </span>
-                                                    )}
-
-                                                    {product.reserved ? (
-                                                        <span className={`badge ${product.stock - product.reserved > 0 ? 'badge-blue' : 'badge-red'} text-[9px]`}>
-                                                            LIBRE: {product.stock - product.reserved}
-                                                        </span>
-                                                    ) : null}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-white/5">
-                                                <div className="text-right">
-                                                    <div className="text-2xl font-black italic tracking-tighter">
-                                                        {product.price.toLocaleString('es-ES')} <span className="text-xs text-text-muted not-italic">€</span>
-                                                    </div>
-                                                    <div className="text-[9px] font-black uppercase text-accent-blue tracking-widest">P. Unitario</div>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <button className="w-10 h-10 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-lg transition-all" title="Editar" onClick={() => handleEdit(product)}>✏️</button>
-                                                    <button className="w-10 h-10 flex items-center justify-center bg-accent-red/10 border border-accent-red/20 rounded-xl hover:bg-accent-red/20 text-lg transition-all" title="Eliminar" onClick={() => handleDelete(product.id)}>🗑️</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                {items.map(product => (
+                                    <ProductRow
+                                        key={product.id}
+                                        product={product}
+                                        isQuickEditing={quickEdit?.id === product.id}
+                                        quickEditVal={quickEdit?.id === product.id ? quickEdit.val : ''}
+                                        onQuickEditStart={() => setQuickEdit({ id: product.id, val: String(product.stock) })}
+                                        onQuickEditChange={val => setQuickEdit({ id: product.id, val })}
+                                        onQuickEditSave={() => quickEdit && saveQuickStock(product, quickEdit.val)}
+                                        onQuickEditCancel={() => setQuickEdit(null)}
+                                        onEdit={() => handleEdit(product)}
+                                        onDelete={() => handleDelete(product.id)}
+                                    />
+                                ))}
                             </div>
                         </div>
                     ))}
