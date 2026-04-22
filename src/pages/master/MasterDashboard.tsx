@@ -5,12 +5,13 @@ import { AnalyticsContainer } from './AnalyticsContainer';
 import { MasterCalendar } from './MasterCalendar';
 import { PointOfSale } from './PointOfSale';
 import { FinancialFeriaReport } from './FinancialFeriaReport';
+import { EmployeeDashboard } from '../employee/EmployeeDashboard';
 import { useAppContext } from '../../context/AppContext';
 import { supabase } from '../../lib/supabaseClient';
 
 export const MasterDashboard: React.FC<{
-    activeTab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS';
-    onTabChange: (tab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS') => void;
+    activeTab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE';
+    onTabChange: (tab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE') => void;
 }> = ({ activeTab, onTabChange }) => {
     const { historicalLogs, activeLogs, deleteDailyLog, isPushEnabled, requestPushPermission } = useAppContext();
     const [isBackingUp, setIsBackingUp] = useState(false);
@@ -106,6 +107,12 @@ export const MasterDashboard: React.FC<{
                     onClick={() => onTabChange('POS')}
                 >
                     🏪 Punto de Venta
+                </button>
+                <button
+                    className={`btn ${activeTab === 'CREATE' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => onTabChange('CREATE')}
+                >
+                    📝 Crear Pedido
                 </button>
             </div>
 
@@ -327,6 +334,18 @@ export const MasterDashboard: React.FC<{
             {activeTab === 'AUDIT' && <DailyAudit />}
             {activeTab === 'CATALOG' && <ProductCatalog />}
             {activeTab === 'POS' && <PointOfSale />}
+            {activeTab === 'CREATE' && (
+                <div className="animate-fade-in">
+                    <div className="page-header">
+                        <div>
+                            <div className="section-label mb-2">Nuevo pedido</div>
+                            <h1 className="page-title">Crear Pedido</h1>
+                            <p className="page-subtitle">Selecciona fecha y caseta. Al enviar, se imprimirá la factura automáticamente.</p>
+                        </div>
+                    </div>
+                    <EmployeeDashboard />
+                </div>
+            )}
         </div>
     );
 };
