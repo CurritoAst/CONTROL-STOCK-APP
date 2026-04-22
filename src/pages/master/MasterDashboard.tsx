@@ -111,6 +111,29 @@ export const MasterDashboard: React.FC<{
 
             {activeTab === 'PANEL' && (
                 <div className="animate-fade-in">
+                    {/* ─── Page Header ─── */}
+                    <div className="page-header">
+                        <div>
+                            <div className="section-label mb-2">Vista general</div>
+                            <h1 className="page-title">Panel Financiero</h1>
+                            <p className="page-subtitle capitalize">
+                                {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+                                <span className="status-dot status-dot-live" />
+                                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary">En vivo</span>
+                            </div>
+                            {pendingAudits > 0 && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-accent-red/10 border border-accent-red/30">
+                                    <span className="status-dot status-dot-alert" />
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-accent-red">{pendingAudits} pendiente{pendingAudits !== 1 ? 's' : ''}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {!isPushEnabled && (
                         <div className="bg-accent-blue/10 border border-accent-blue/20 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -140,12 +163,7 @@ export const MasterDashboard: React.FC<{
                             <button
                                 className="btn btn-outline whitespace-nowrap w-full sm:w-auto shrink-0"
                                 onClick={async () => {
-                                    const { createClient } = await import('@supabase/supabase-js');
-                                    const sb = createClient(
-                                        import.meta.env.VITE_SUPABASE_URL,
-                                        import.meta.env.VITE_SUPABASE_ANON_KEY
-                                    );
-                                    const result = await sb.functions.invoke('send-web-push', {
+                                    const result = await supabase.functions.invoke('send-web-push', {
                                         body: { title: '🔔 Prueba de Notificación', message: '¡Las notificaciones están funcionando correctamente!', target_role: 'MASTER' },
                                         headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
                                     });
@@ -157,14 +175,54 @@ export const MasterDashboard: React.FC<{
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-md mb-6">
-                        <div className="card text-center">
-                            <h3 className="text-muted text-lg mb-2">Gasto Histórico Total</h3>
-                            <div className="text-3xl font-bold text-danger">{totalExpenses.toLocaleString('es-ES')} €</div>
+                    {/* ─── Stat Cards ─── */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                        <div className="stat-card">
+                            <div className="flex items-start justify-between mb-5">
+                                <div>
+                                    <div className="section-label mb-2">Gasto Histórico</div>
+                                    <div className="text-[10px] text-text-muted">Coste total acumulado</div>
+                                </div>
+                                <div className="w-10 h-10 rounded-xl bg-accent-red/15 border border-accent-red/20 flex items-center justify-center text-base">
+                                    💸
+                                </div>
+                            </div>
+                            <div className="text-3xl font-black text-accent-red tracking-tight">
+                                {totalExpenses.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                <span className="text-lg text-accent-red/70 ml-1 font-bold">€</span>
+                            </div>
                         </div>
-                        <div className="card text-center">
-                            <h3 className="text-muted text-lg mb-2">Servicios Registrados</h3>
-                            <div className="text-3xl font-bold">{historicalLogs.length}</div>
+
+                        <div className="stat-card">
+                            <div className="flex items-start justify-between mb-5">
+                                <div>
+                                    <div className="section-label mb-2">Servicios Registrados</div>
+                                    <div className="text-[10px] text-text-muted">Cierres completados</div>
+                                </div>
+                                <div className="w-10 h-10 rounded-xl bg-accent-blue/15 border border-accent-blue/20 flex items-center justify-center text-base">
+                                    📊
+                                </div>
+                            </div>
+                            <div className="text-3xl font-black text-text-primary tracking-tight">
+                                {historicalLogs.length}
+                                <span className="text-base text-text-muted ml-2 font-bold">servicios</span>
+                            </div>
+                        </div>
+
+                        <div className="stat-card">
+                            <div className="flex items-start justify-between mb-5">
+                                <div>
+                                    <div className="section-label mb-2">Pedidos Activos</div>
+                                    <div className="text-[10px] text-text-muted">En curso o por auditar</div>
+                                </div>
+                                <div className="w-10 h-10 rounded-xl bg-accent-green/15 border border-accent-green/20 flex items-center justify-center text-base">
+                                    📦
+                                </div>
+                            </div>
+                            <div className="text-3xl font-black text-accent-green tracking-tight">
+                                {activeLogs.filter(l => ['PENDING_PEDIDO', 'OPEN', 'CLOSED'].includes(l.status)).length}
+                                <span className="text-base text-accent-green/70 ml-2 font-bold">activos</span>
+                            </div>
                         </div>
                     </div>
 
@@ -183,7 +241,7 @@ export const MasterDashboard: React.FC<{
                                     .map(log => {
                                         const isClosed = log.status === 'CLOSED';
                                         const isPending = log.status === 'PENDING_PEDIDO';
-                                        
+
                                         // Calculate cost based on status:
                                         // If CLOSED, we know consumed. If OPEN/PENDING, we only know prepared (estimated cost).
                                         const dayCost = log.items.reduce((sum, i) => {
@@ -198,8 +256,8 @@ export const MasterDashboard: React.FC<{
                                                         <span className="text-accent-blue">📅</span>
                                                         {log.date}
                                                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
-                                                            isPending ? 'bg-accent-blue/20 text-accent-blue' : 
-                                                            isClosed ? 'bg-accent-green/20 text-accent-green' : 
+                                                            isPending ? 'bg-accent-blue/20 text-accent-blue' :
+                                                            isClosed ? 'bg-accent-green/20 text-accent-green' :
                                                             'bg-accent-purple/20 text-accent-purple'
                                                         }`}>
                                                             {isPending ? 'Pendiente' : isClosed ? 'Por Auditar' : 'En Curso'}
