@@ -112,7 +112,7 @@ export const MasterDashboard: React.FC<{
                     className={`btn ${activeTab === 'CREATE' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => onTabChange('CREATE')}
                 >
-                    📝 Crear Pedido
+                    🗂 Gestión Diaria
                 </button>
             </div>
 
@@ -338,9 +338,9 @@ export const MasterDashboard: React.FC<{
                 <div className="animate-fade-in">
                     <div className="page-header">
                         <div>
-                            <div className="section-label mb-2">Nuevo pedido</div>
-                            <h1 className="page-title">Crear Pedido</h1>
-                            <p className="page-subtitle">Selecciona fecha y caseta. Al enviar, se imprimirá la factura automáticamente.</p>
+                            <div className="section-label mb-2">Operación diaria</div>
+                            <h1 className="page-title">Gestión Diaria</h1>
+                            <p className="page-subtitle">Crear pedidos nuevos, registrar sobrantes de pedidos en curso y gestionar casetas. La factura se imprime automáticamente al enviar.</p>
                         </div>
                     </div>
                     <EmployeeDashboard />

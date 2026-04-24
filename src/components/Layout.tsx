@@ -36,7 +36,7 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
         {
             section: 'Operaciones',
             items: [
-                { id: 'CREATE', label: 'Crear Pedido', icon: '📝', shortLabel: 'Crear' },
+                { id: 'CREATE', label: 'Gestión Diaria', icon: '🗂', shortLabel: 'Gestión' },
                 { id: 'AUDIT', label: 'Pedidos Diarios', icon: '📋', shortLabel: 'Pedidos', badge: pendingAudits },
                 { id: 'CATALOG', label: 'Catálogo de Productos', icon: '🥩', shortLabel: 'Catálogo' },
                 { id: 'CALENDAR', label: 'Calendario', icon: '📅', shortLabel: 'Calend.' },
