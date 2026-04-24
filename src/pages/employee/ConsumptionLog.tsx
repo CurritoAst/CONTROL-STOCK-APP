@@ -14,6 +14,7 @@ export const ConsumptionLog: React.FC<{
     // sobrantes[productId] = units leftover (to return to warehouse)
     const [sobrantes, setSobrantes] = useState<Record<string, number>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [search, setSearch] = useState('');
 
     if (!currentLog && (!aggregatedLogs || aggregatedLogs.length === 0)) return null;
 
@@ -108,6 +109,10 @@ export const ConsumptionLog: React.FC<{
 
     const totalSobrantes = items.reduce((sum, item) => sum + (sobrantes[item.product.id] ?? 0), 0);
 
+    const visibleItems = search.trim() === ''
+        ? items
+        : items.filter(item => item.product.name.toLowerCase().includes(search.trim().toLowerCase()));
+
     return (
         <div className="card">
             <div className="flex justify-between items-start mb-6 gap-3">
@@ -134,8 +139,32 @@ export const ConsumptionLog: React.FC<{
                 </div>
             )}
 
+            {/* Product search */}
+            <div className="relative mb-4">
+                <input
+                    type="text"
+                    placeholder="Buscar producto..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-3 pl-10 text-white outline-none focus:border-accent-blue placeholder:text-text-muted"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">🔍</span>
+                {search && (
+                    <button
+                        onClick={() => setSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm"
+                        title="Limpiar búsqueda"
+                    >✕</button>
+                )}
+            </div>
+
             <div className="flex flex-col gap-3 mb-6">
-                {items.map(item => {
+                {visibleItems.length === 0 && (
+                    <p className="text-text-muted text-center py-6 text-sm">
+                        No hay productos que coincidan con "{search}".
+                    </p>
+                )}
+                {visibleItems.map(item => {
                     const leftover = sobrantes[item.product.id] ?? 0;
                     return (
                         <div key={item.product.id} className="flex items-center justify-between p-4 border border-white/10 rounded-lg bg-bg-primary/50 gap-4">
