@@ -255,6 +255,7 @@ export const FinancialFeriaReport: React.FC = () => {
     const [newProdName, setNewProdName] = useState('');
     const [newProdPrice, setNewProdPrice] = useState('');
     const [newProdCategory, setNewProdCategory] = useState('General');
+    const [catalogSearch, setCatalogSearch] = useState('');
 
     const allCategoryOptions = useMemo(() => {
         const fromCatalog = categories || [];
@@ -323,6 +324,10 @@ export const FinancialFeriaReport: React.FC = () => {
         setAddProductId('');
         setAddPrepared('');
         setAddConsumed('');
+        setCatalogSearch('');
+        setNewProdOpen(false);
+        setNewProdName('');
+        setNewProdPrice('');
     };
 
     const closeTotalEditor = () => {
@@ -355,6 +360,10 @@ export const FinancialFeriaReport: React.FC = () => {
         setAddProductId('');
         setAddPrepared('');
         setAddConsumed('');
+        setCatalogSearch('');
+        setNewProdOpen(false);
+        setNewProdName('');
+        setNewProdPrice('');
     };
 
     const closeEditor = () => {
@@ -377,6 +386,10 @@ export const FinancialFeriaReport: React.FC = () => {
         setAddProductId('');
         setAddPrepared('');
         setAddConsumed('');
+        setCatalogSearch('');
+        setNewProdOpen(false);
+        setNewProdName('');
+        setNewProdPrice('');
     };
 
     const handleSaveEdit = async () => {
@@ -397,8 +410,12 @@ export const FinancialFeriaReport: React.FC = () => {
 
     const availableToAdd = useMemo(() => {
         const usedIds = new Set(editRows.map(r => r.product.id));
-        return products.filter(p => !usedIds.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
-    }, [products, editRows]);
+        const q = catalogSearch.trim().toLowerCase();
+        return products
+            .filter(p => !usedIds.has(p.id))
+            .filter(p => q === '' || p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [products, editRows, catalogSearch]);
 
     const filteredEditRows = editSearch.trim() === ''
         ? editRows
@@ -821,14 +838,31 @@ export const FinancialFeriaReport: React.FC = () => {
                         </div>
 
                         <div className="border-t border-white/5 pt-5">
-                            <div className="section-label mb-2">Añadir producto al total</div>
+                            <div className="section-label mb-2">Añadir desde el catálogo ({availableToAdd.length} disponibles)</div>
+                            <div className="relative mb-2">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar producto del catálogo..."
+                                    value={catalogSearch}
+                                    onChange={e => setCatalogSearch(e.target.value)}
+                                    className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-2 pl-9 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
+                                />
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">🔍</span>
+                                {catalogSearch && (
+                                    <button
+                                        onClick={() => setCatalogSearch('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm px-1"
+                                    >✕</button>
+                                )}
+                            </div>
                             <div className="flex flex-col sm:flex-row gap-2">
                                 <select
                                     value={addProductId}
                                     onChange={e => setAddProductId(e.target.value)}
                                     className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-accent-blue text-sm"
+                                    size={1}
                                 >
-                                    <option value="">-- Selecciona producto --</option>
+                                    <option value="">-- Selecciona producto del catálogo --</option>
                                     {availableToAdd.map(p => (
                                         <option key={p.id} value={p.id}>{p.name} ({p.category || 'General'})</option>
                                     ))}
@@ -1034,14 +1068,31 @@ export const FinancialFeriaReport: React.FC = () => {
 
                         {/* Add new product */}
                         <div className="border-t border-white/5 pt-5">
-                            <div className="section-label mb-2">Añadir producto al pedido</div>
+                            <div className="section-label mb-2">Añadir desde el catálogo ({availableToAdd.length} disponibles)</div>
+                            <div className="relative mb-2">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar producto del catálogo..."
+                                    value={catalogSearch}
+                                    onChange={e => setCatalogSearch(e.target.value)}
+                                    className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-2 pl-9 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
+                                />
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">🔍</span>
+                                {catalogSearch && (
+                                    <button
+                                        onClick={() => setCatalogSearch('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm px-1"
+                                    >✕</button>
+                                )}
+                            </div>
                             <div className="flex flex-col sm:flex-row gap-2">
                                 <select
                                     value={addProductId}
                                     onChange={e => setAddProductId(e.target.value)}
                                     className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-accent-blue text-sm"
+                                    size={1}
                                 >
-                                    <option value="">-- Selecciona producto --</option>
+                                    <option value="">-- Selecciona producto del catálogo --</option>
                                     {availableToAdd.map(p => (
                                         <option key={p.id} value={p.id}>{p.name} ({p.category || 'General'})</option>
                                     ))}
