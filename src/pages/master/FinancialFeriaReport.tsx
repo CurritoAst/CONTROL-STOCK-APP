@@ -238,7 +238,7 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
 type EditRow = { product: Product; prepared: number; consumed: number };
 
 export const FinancialFeriaReport: React.FC = () => {
-    const { historicalLogs, products, editHistoricalLog, editOrderTotal } = useAppContext();
+    const { historicalLogs, products, categories, editHistoricalLog, editOrderTotal, addProduct } = useAppContext();
     const { addToast } = useToast();
     const [selectedOrderId, setSelectedOrderId] = useState<string>('');
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -251,6 +251,54 @@ export const FinancialFeriaReport: React.FC = () => {
     const [addConsumed, setAddConsumed] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const [editingTotal, setEditingTotal] = useState<{ title: string; lastDate: string; dayCount: number } | null>(null);
+    const [newProdOpen, setNewProdOpen] = useState(false);
+    const [newProdName, setNewProdName] = useState('');
+    const [newProdPrice, setNewProdPrice] = useState('');
+    const [newProdCategory, setNewProdCategory] = useState('General');
+
+    const allCategoryOptions = useMemo(() => {
+        const fromCatalog = categories || [];
+        const fromProducts = products.map(p => p.category || 'General');
+        return Array.from(new Set(['General', ...fromCatalog, ...fromProducts])).sort();
+    }, [categories, products]);
+
+    const handleCreateNewProduct = async () => {
+        const name = newProdName.trim();
+        const price = parseFloat(newProdPrice);
+        const prep = parseInt(addPrepared, 10) || 0;
+        const cons = parseInt(addConsumed, 10) || 0;
+
+        if (!name) { addToast('Introduce el nombre del producto', 'error'); return; }
+        if (isNaN(price) || price < 0) { addToast('Introduce un precio válido', 'error'); return; }
+        if (prep <= 0) { addToast('El preparado debe ser mayor que 0', 'error'); return; }
+        if (cons > prep) { addToast('Consumido no puede ser mayor que preparado', 'error'); return; }
+        if (editRows.some(r => r.product.name.toLowerCase() === name.toLowerCase())) {
+            addToast(`Ya hay un producto llamado "${name}" en el pedido`, 'error');
+            return;
+        }
+
+        const newProduct = {
+            id: `p${Date.now()}`,
+            name,
+            price,
+            category: newProdCategory || 'General',
+            stock: 0,
+        };
+
+        try {
+            await addProduct(newProduct);
+            setEditRows(rows => [...rows, { product: newProduct, prepared: prep, consumed: cons }]);
+            setNewProdName('');
+            setNewProdPrice('');
+            setNewProdCategory('General');
+            setAddPrepared('');
+            setAddConsumed('');
+            setNewProdOpen(false);
+            addToast(`"${name}" creado y añadido al pedido`, 'success');
+        } catch (e: any) {
+            addToast('Error al crear producto: ' + (e.message || 'inténtalo de nuevo'), 'error');
+        }
+    };
 
     const openTotalEditor = (title: string) => {
         const logs = historicalLogs
@@ -810,6 +858,52 @@ export const FinancialFeriaReport: React.FC = () => {
                                 </button>
                             </div>
                             <p className="text-[10px] text-text-muted mt-2">El producto se insertará en el último día del evento.</p>
+
+                            <div className="mt-4">
+                                <button
+                                    onClick={() => setNewProdOpen(o => !o)}
+                                    className="text-xs font-bold text-accent-blue hover:text-accent-blue-hover transition-colors"
+                                >
+                                    {newProdOpen ? '− Cancelar nuevo producto' : '+ Crear producto nuevo (no está en el catálogo)'}
+                                </button>
+                                {newProdOpen && (
+                                    <div className="mt-3 p-3 bg-accent-blue/5 border border-accent-blue/20 rounded-xl space-y-2">
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Nombre del producto"
+                                                value={newProdName}
+                                                onChange={e => setNewProdName(e.target.value)}
+                                                className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm"
+                                            />
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                placeholder="Precio €"
+                                                value={newProdPrice}
+                                                onChange={e => setNewProdPrice(e.target.value)}
+                                                className="w-24 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white text-center text-sm outline-none focus:border-accent-blue"
+                                            />
+                                            <select
+                                                value={newProdCategory}
+                                                onChange={e => setNewProdCategory(e.target.value)}
+                                                className="bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm"
+                                            >
+                                                {allCategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                        <button
+                                            onClick={handleCreateNewProduct}
+                                            disabled={!newProdName.trim() || !newProdPrice || !addPrepared}
+                                            className="btn btn-outline border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 w-full disabled:opacity-50 text-xs py-2"
+                                        >
+                                            Crear y añadir (usa prep/cons de arriba)
+                                        </button>
+                                        <p className="text-[10px] text-text-muted">Se creará en el catálogo con stock 0 y se añadirá al pedido con los valores prep/cons indicados arriba.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -977,6 +1071,52 @@ export const FinancialFeriaReport: React.FC = () => {
                                 </button>
                             </div>
                             <p className="text-[10px] text-text-muted mt-2">Al añadir un producto se descontará del stock por la cantidad consumida.</p>
+
+                            <div className="mt-4">
+                                <button
+                                    onClick={() => setNewProdOpen(o => !o)}
+                                    className="text-xs font-bold text-accent-blue hover:text-accent-blue-hover transition-colors"
+                                >
+                                    {newProdOpen ? '− Cancelar nuevo producto' : '+ Crear producto nuevo (no está en el catálogo)'}
+                                </button>
+                                {newProdOpen && (
+                                    <div className="mt-3 p-3 bg-accent-blue/5 border border-accent-blue/20 rounded-xl space-y-2">
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Nombre del producto"
+                                                value={newProdName}
+                                                onChange={e => setNewProdName(e.target.value)}
+                                                className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm"
+                                            />
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                placeholder="Precio €"
+                                                value={newProdPrice}
+                                                onChange={e => setNewProdPrice(e.target.value)}
+                                                className="w-24 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white text-center text-sm outline-none focus:border-accent-blue"
+                                            />
+                                            <select
+                                                value={newProdCategory}
+                                                onChange={e => setNewProdCategory(e.target.value)}
+                                                className="bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm"
+                                            >
+                                                {allCategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                        <button
+                                            onClick={handleCreateNewProduct}
+                                            disabled={!newProdName.trim() || !newProdPrice || !addPrepared}
+                                            className="btn btn-outline border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 w-full disabled:opacity-50 text-xs py-2"
+                                        >
+                                            Crear y añadir (usa prep/cons de arriba)
+                                        </button>
+                                        <p className="text-[10px] text-text-muted">Se creará en el catálogo con stock 0 y se añadirá al pedido con los valores prep/cons indicados arriba.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
