@@ -22,6 +22,7 @@ interface AppContextType extends AppState {
     refreshData: () => Promise<void>;
     updatePedidoItems: (logId: string, items: { product: Product, prepared: number }[]) => Promise<void>;
     editHistoricalLog: (logId: string, items: { product: Product, prepared: number, consumed: number }[]) => Promise<void>;
+    editOrderTotal: (eventTitle: string, items: { product: Product, prepared: number, consumed: number }[]) => Promise<void>;
     repairPendingStock: () => Promise<number>;
     duplicateDailyLog: (sourceLogId: string, newDate: string) => Promise<void>;
     isPushEnabled: boolean;
@@ -627,6 +628,100 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await refreshData();
     };
 
+    const editOrderTotal = async (
+        eventTitle: string,
+        newItems: { product: Product, prepared: number, consumed: number }[]
+    ): Promise<void> => {
+        const normalizedTitle = eventTitle === 'Pedido General' ? '' : eventTitle;
+        const orderLogs = state.historicalLogs
+            .filter(l => (l.eventTitle || 'Pedido General') === eventTitle)
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        if (orderLogs.length === 0) throw new Error('Pedido no encontrado');
+        const lastLog = orderLogs[orderLogs.length - 1];
+
+        for (const item of newItems) {
+            if (item.consumed > item.prepared) throw new Error(`"${item.product.name}": consumido > preparado`);
+            if (item.prepared < 0 || item.consumed < 0) throw new Error(`"${item.product.name}": valores negativos`);
+        }
+
+        const oldTotals: Record<string, { prepared: number; consumed: number }> = {};
+        orderLogs.forEach(log => {
+            log.items.forEach(it => {
+                if (!oldTotals[it.product.id]) oldTotals[it.product.id] = { prepared: 0, consumed: 0 };
+                oldTotals[it.product.id].prepared += it.prepared;
+                oldTotals[it.product.id].consumed += it.consumed;
+            });
+        });
+
+        const newLastItems: Record<string, { product: Product; prepared: number; consumed: number }> = {};
+        lastLog.items.forEach(it => {
+            newLastItems[it.product.id] = { product: it.product, prepared: it.prepared, consumed: it.consumed };
+        });
+
+        const stockAdjustments: { productId: string; delta: number; product: Product }[] = [];
+
+        for (const ni of newItems) {
+            const old = oldTotals[ni.product.id] || { prepared: 0, consumed: 0 };
+            const dPrep = ni.prepared - old.prepared;
+            const dCons = ni.consumed - old.consumed;
+
+            const curLast = newLastItems[ni.product.id] || { product: ni.product, prepared: 0, consumed: 0 };
+            const nextLastPrep = curLast.prepared + dPrep;
+            const nextLastCons = curLast.consumed + dCons;
+
+            if (nextLastPrep < 0 || nextLastCons < 0) {
+                throw new Error(`"${ni.product.name}": la reducción supera lo registrado en el último día (${lastLog.date}). Edita ese día desde la tabla de facturas por día.`);
+            }
+            if (nextLastCons > nextLastPrep) {
+                throw new Error(`"${ni.product.name}": el consumido del último día superaría el preparado. Edita ese día individualmente.`);
+            }
+
+            if (nextLastPrep === 0 && nextLastCons === 0) {
+                delete newLastItems[ni.product.id];
+            } else {
+                newLastItems[ni.product.id] = { product: ni.product, prepared: nextLastPrep, consumed: nextLastCons };
+            }
+
+            if (dCons !== 0) stockAdjustments.push({ productId: ni.product.id, delta: -dCons, product: ni.product });
+        }
+
+        for (const oldId of Object.keys(oldTotals)) {
+            const stillExists = newItems.find(ni => ni.product.id === oldId);
+            if (!stillExists) {
+                const old = oldTotals[oldId];
+                if (old.consumed > 0) {
+                    const prod = orderLogs.flatMap(l => l.items).find(i => i.product.id === oldId)?.product;
+                    if (prod) stockAdjustments.push({ productId: oldId, delta: old.consumed, product: prod });
+                }
+                if (newLastItems[oldId]) delete newLastItems[oldId];
+            }
+        }
+
+        for (const adj of stockAdjustments) {
+            const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', adj.productId).single();
+            const currentStock = freshProduct?.stock ?? adj.product.stock;
+            await supabase.from('products').update({ stock: Math.max(0, currentStock + adj.delta) }).eq('id', adj.productId);
+        }
+
+        const { error: delErr } = await supabase.from('log_items').delete().eq('daily_log_id', lastLog.id);
+        if (delErr) throw delErr;
+
+        const itemsToInsert = Object.values(newLastItems).map(it => ({
+            daily_log_id: lastLog.id,
+            product_id: it.product.id,
+            prepared: it.prepared,
+            consumed: it.consumed,
+        }));
+        if (itemsToInsert.length > 0) {
+            const { error: insErr } = await supabase.from('log_items').insert(itemsToInsert);
+            if (insErr) throw insErr;
+        }
+
+        void normalizedTitle;
+        await refreshData();
+    };
+
     const duplicateDailyLog = async (sourceLogId: string, newDate: string): Promise<void> => {
         const sourceLog = state.activeLogs.find(l => l.id === sourceLogId)
             || state.historicalLogs.find(l => l.id === sourceLogId);
@@ -675,6 +770,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             refreshData,
             updatePedidoItems,
             editHistoricalLog,
+            editOrderTotal,
             repairPendingStock,
             duplicateDailyLog,
             isPushEnabled,

@@ -238,7 +238,7 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
 type EditRow = { product: Product; prepared: number; consumed: number };
 
 export const FinancialFeriaReport: React.FC = () => {
-    const { historicalLogs, products, editHistoricalLog } = useAppContext();
+    const { historicalLogs, products, editHistoricalLog, editOrderTotal } = useAppContext();
     const { addToast } = useToast();
     const [selectedOrderId, setSelectedOrderId] = useState<string>('');
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -250,6 +250,53 @@ export const FinancialFeriaReport: React.FC = () => {
     const [addPrepared, setAddPrepared] = useState('');
     const [addConsumed, setAddConsumed] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [editingTotal, setEditingTotal] = useState<{ title: string; lastDate: string; dayCount: number } | null>(null);
+
+    const openTotalEditor = (title: string) => {
+        const logs = historicalLogs
+            .filter(l => (l.eventTitle || 'Pedido General') === title)
+            .sort((a, b) => a.date.localeCompare(b.date));
+        if (logs.length === 0) { addToast('No hay pedidos para este evento', 'error'); return; }
+
+        const aggregated: Record<string, EditRow> = {};
+        logs.forEach(log => {
+            log.items.forEach(it => {
+                if (!aggregated[it.product.id]) {
+                    aggregated[it.product.id] = { product: it.product, prepared: 0, consumed: 0 };
+                }
+                aggregated[it.product.id].prepared += it.prepared;
+                aggregated[it.product.id].consumed += it.consumed;
+            });
+        });
+
+        setEditingTotal({ title, lastDate: logs[logs.length - 1].date, dayCount: logs.length });
+        setEditRows(Object.values(aggregated).sort((a, b) => a.product.name.localeCompare(b.product.name)));
+        setEditSearch('');
+        setAddProductId('');
+        setAddPrepared('');
+        setAddConsumed('');
+    };
+
+    const closeTotalEditor = () => {
+        setEditingTotal(null);
+        setEditRows([]);
+    };
+
+    const handleSaveTotal = async () => {
+        if (!editingTotal) return;
+        const validRows = editRows.filter(r => r.prepared > 0);
+        if (validRows.length === 0) { addToast('El pedido debe tener al menos un producto', 'error'); return; }
+        setIsSavingEdit(true);
+        try {
+            await editOrderTotal(editingTotal.title, validRows);
+            addToast('Total del evento actualizado', 'success');
+            closeTotalEditor();
+        } catch (e: any) {
+            addToast('Error al guardar: ' + (e.message || 'inténtalo de nuevo'), 'error');
+        } finally {
+            setIsSavingEdit(false);
+        }
+    };
 
     const openEditor = (logId: string, date: string, title: string) => {
         const log = historicalLogs.find(l => l.id === logId);
@@ -486,9 +533,16 @@ export const FinancialFeriaReport: React.FC = () => {
                         </div>
 
                         <div>
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                                 <h4 className="text-sm font-bold uppercase text-text-muted border-l-2 border-accent-red pl-3">Facturas por Día</h4>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap">
+                                    <button
+                                        onClick={() => openTotalEditor(selectedOrder.title)}
+                                        className="text-[11px] px-3 py-1.5 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold"
+                                        title="Editar preparado/consumido agregado del evento"
+                                    >
+                                        ✏️ Editar Total
+                                    </button>
                                     <button
                                         onClick={() => downloadOrderTotalInvoice(selectedOrder)}
                                         className="text-[11px] px-3 py-1.5 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold"
@@ -614,6 +668,170 @@ export const FinancialFeriaReport: React.FC = () => {
                 </div>
             )}
         </div>
+
+        {/* ─── Edit TOTAL Modal ─── */}
+        {editingTotal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+                <div className="bg-bg-elevated border border-white/10 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+                    <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                            <div className="section-label mb-1">Editar Total del Evento</div>
+                            <h3 className="text-xl font-bold truncate" title={editingTotal.title}>{editingTotal.title}</h3>
+                            <p className="text-sm text-text-muted mt-0.5">
+                                Agregado de <strong className="text-white">{editingTotal.dayCount}</strong> día{editingTotal.dayCount !== 1 ? 's' : ''} — los cambios se aplican al último (<strong className="text-white">{editingTotal.lastDate}</strong>)
+                            </p>
+                        </div>
+                        <button
+                            className="text-text-muted hover:text-white transition-colors p-1 text-lg shrink-0"
+                            onClick={closeTotalEditor}
+                            disabled={isSavingEdit}
+                            title="Cerrar"
+                        >✕</button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                        <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-3 text-xs text-text-secondary">
+                            <span className="text-accent-blue font-bold">ℹ️</span>{' '}
+                            Estás editando el total agregado. Cada cambio (o producto añadido) se suma al último día del evento, que es el que se ajustará. El stock se recalcula sólo con la diferencia en consumido.
+                        </div>
+
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Buscar producto..."
+                                value={editSearch}
+                                onChange={e => setEditSearch(e.target.value)}
+                                className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-3 pl-10 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
+                            />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">🔍</span>
+                            {editSearch && (
+                                <button
+                                    onClick={() => setEditSearch('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm"
+                                >✕</button>
+                            )}
+                        </div>
+
+                        <div>
+                            <div className="section-label mb-2">Totales por producto ({editRows.length})</div>
+                            <div className="flex flex-col gap-2">
+                                {filteredEditRows.length === 0 && (
+                                    <div className="text-sm text-text-muted italic text-center py-6">
+                                        {editSearch ? `No hay coincidencias con "${editSearch}".` : 'El evento no tiene productos agregados.'}
+                                    </div>
+                                )}
+                                {filteredEditRows.map(row => {
+                                    const rowIdx = editRows.findIndex(r => r.product.id === row.product.id);
+                                    return (
+                                        <div key={row.product.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-black/30 border border-white/5 rounded-xl">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold truncate" title={row.product.name}>{row.product.name}</div>
+                                                <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">{row.product.category || 'General'}</div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <label className="flex flex-col items-center">
+                                                    <span className="text-[9px] font-bold uppercase text-text-muted tracking-wider mb-0.5">Total Prep.</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={row.prepared}
+                                                        onChange={e => {
+                                                            const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                                            setEditRows(rows => rows.map((r, i) => i === rowIdx ? { ...r, prepared: val } : r));
+                                                        }}
+                                                        className="w-20 text-center text-sm font-bold p-1.5 rounded border border-white/10 bg-bg-primary/60 outline-none focus:border-accent-blue"
+                                                    />
+                                                </label>
+                                                <label className="flex flex-col items-center">
+                                                    <span className="text-[9px] font-bold uppercase text-accent-blue tracking-wider mb-0.5">Total Cons.</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={row.prepared}
+                                                        value={row.consumed}
+                                                        onChange={e => {
+                                                            const val = Math.max(0, Math.min(row.prepared, parseInt(e.target.value, 10) || 0));
+                                                            setEditRows(rows => rows.map((r, i) => i === rowIdx ? { ...r, consumed: val } : r));
+                                                        }}
+                                                        className="w-20 text-center text-sm font-bold p-1.5 rounded border border-accent-blue/40 bg-accent-blue/10 text-accent-blue outline-none focus:border-accent-blue"
+                                                    />
+                                                </label>
+                                                <div className="text-center">
+                                                    <span className="text-[9px] font-bold uppercase text-accent-red tracking-wider block">Sobrante</span>
+                                                    <span className="text-sm font-bold text-accent-red">{Math.max(0, row.prepared - row.consumed)}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => setEditRows(rows => rows.filter((_, i) => i !== rowIdx))}
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent-red/10 border border-accent-red/20 text-accent-red hover:bg-accent-red/20 text-sm"
+                                                    title="Quitar"
+                                                >🗑</button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="border-t border-white/5 pt-5">
+                            <div className="section-label mb-2">Añadir producto al total</div>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <select
+                                    value={addProductId}
+                                    onChange={e => setAddProductId(e.target.value)}
+                                    className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-accent-blue text-sm"
+                                >
+                                    <option value="">-- Selecciona producto --</option>
+                                    {availableToAdd.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name} ({p.category || 'General'})</option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={addPrepared}
+                                    onChange={e => setAddPrepared(e.target.value)}
+                                    placeholder="Prep."
+                                    className="w-20 sm:w-24 bg-bg-primary/50 border border-white/20 rounded-lg p-2.5 text-white text-center text-sm outline-none focus:border-accent-blue"
+                                />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={addConsumed}
+                                    onChange={e => setAddConsumed(e.target.value)}
+                                    placeholder="Cons."
+                                    className="w-20 sm:w-24 bg-bg-primary/50 border border-accent-blue/40 rounded-lg p-2.5 text-accent-blue text-center text-sm outline-none focus:border-accent-blue"
+                                />
+                                <button
+                                    onClick={handleAddProduct}
+                                    disabled={!addProductId || !addPrepared}
+                                    className="btn btn-outline border-accent-green/40 text-accent-green hover:bg-accent-green/10 shrink-0 disabled:opacity-50 text-xs py-2.5"
+                                >
+                                    + Añadir
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-text-muted mt-2">El producto se insertará en el último día del evento.</p>
+                        </div>
+                    </div>
+
+                    <div className="p-6 border-t border-white/10 flex gap-3">
+                        <button
+                            className="btn btn-outline flex-1"
+                            onClick={closeTotalEditor}
+                            disabled={isSavingEdit}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn btn-primary flex-1 disabled:opacity-50"
+                            onClick={handleSaveTotal}
+                            disabled={isSavingEdit}
+                        >
+                            {isSavingEdit ? '⏳ Guardando...' : '💾 Guardar Total'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* ─── Edit Historical Log Modal ─── */}
         {editing && (
