@@ -87,7 +87,7 @@ const downloadDayInvoice = (day: any, orderTitle: string, email = false) => {
     const markedUpItems = day.items.map((item: any) => {
         const sobrante = Math.max(0, item.prepared - item.consumed);
         const originalPrice = item.product.price;
-        const markupPrice = originalPrice * 1.25;
+        const markupPrice = originalPrice * 1.05;
 
         invoiceTotalExpense += item.consumed * markupPrice;
         invoiceTotalLoss += sobrante * markupPrice;
@@ -131,7 +131,7 @@ const downloadDayInvoice = (day: any, orderTitle: string, email = false) => {
       <th class="center">Consumido</th>
       <th class="center">Sobrante</th>
       <th class="right">Base/ud</th>
-      <th class="right">+25%/ud</th>
+      <th class="right">+5%/ud</th>
       <th class="right">Coste Total</th>
     </tr></thead>
     <tbody>${rows}</tbody>
@@ -161,7 +161,7 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
         day.items.forEach((item: any) => {
             const id = item.product.id;
             if (!merged[id]) {
-                const markupPrice = item.product.price * 1.25;
+                const markupPrice = item.product.price * 1.05;
                 merged[id] = { product: { ...item.product, price: markupPrice, originalPrice: item.product.price }, prepared: 0, consumed: 0 };
             }
             merged[id].prepared += item.prepared;
@@ -213,7 +213,7 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
       <th class="center">Total Consumido</th>
       <th class="center">Total Sobrante</th>
       <th class="right">Base/ud</th>
-      <th class="right">+25%/ud</th>
+      <th class="right">+5%/ud</th>
       <th class="right">Coste Total</th>
     </tr></thead>
     <tbody>${rows}</tbody>
