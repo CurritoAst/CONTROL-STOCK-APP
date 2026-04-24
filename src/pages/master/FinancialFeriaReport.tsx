@@ -1121,7 +1121,7 @@ export const FinancialFeriaReport: React.FC = () => {
                                     + Añadir
                                 </button>
                             </div>
-                            <p className="text-[10px] text-text-muted mt-2">Al añadir un producto se descontará del stock por la cantidad consumida.</p>
+                            <p className="text-[10px] text-text-muted mt-2">Al añadir un producto nuevo se descontará del stock por el preparado (consumido + sobrante). Para productos ya existentes solo afecta el cambio en consumido.</p>
 
                             <div className="mt-4">
                                 <button

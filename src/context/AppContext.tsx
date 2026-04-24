@@ -586,17 +586,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
         }
 
-        // For APPROVED/CLOSED logs the stock already reflects -consumed (prepared was
-        // discounted at open, leftover returned at close). Only consumed delta matters.
+        // Stock logic for APPROVED/CLOSED logs:
+        // - EXISTING items: stock already reflects -consumed (leftover was returned
+        //   at close). Use consumed delta.
+        // - NEW items added retroactively: subtract the FULL prepared (consumed +
+        //   sobrante) since the sobrante hasn't been returned to the warehouse.
         for (const newItem of newItems) {
             const oldItem = currentLog.items.find(i => i.product.id === newItem.product.id);
-            const oldConsumed = oldItem?.consumed ?? 0;
-            const consumedDelta = newItem.consumed - oldConsumed;
+            let stockDelta = 0;
 
-            if (consumedDelta !== 0) {
+            if (oldItem) {
+                stockDelta = -(newItem.consumed - oldItem.consumed);
+            } else if (newItem.prepared > 0) {
+                stockDelta = -newItem.prepared;
+            }
+
+            if (stockDelta !== 0) {
                 const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', newItem.product.id).single();
                 const currentStock = freshProduct?.stock ?? newItem.product.stock;
-                const newStock = Math.max(0, currentStock - consumedDelta);
+                const newStock = Math.max(0, currentStock + stockDelta);
                 await supabase.from('products').update({ stock: newStock }).eq('id', newItem.product.id);
             }
         }
@@ -662,6 +670,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const stockAdjustments: { productId: string; delta: number; product: Product }[] = [];
 
         for (const ni of newItems) {
+            const existedBefore = !!oldTotals[ni.product.id];
             const old = oldTotals[ni.product.id] || { prepared: 0, consumed: 0 };
             const dPrep = ni.prepared - old.prepared;
             const dCons = ni.consumed - old.consumed;
@@ -683,7 +692,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 newLastItems[ni.product.id] = { product: ni.product, prepared: nextLastPrep, consumed: nextLastCons };
             }
 
-            if (dCons !== 0) stockAdjustments.push({ productId: ni.product.id, delta: -dCons, product: ni.product });
+            // Stock: existing products use consumed delta (sobrante already returned);
+            // NEW products added retroactively subtract their full prepared (sobrante
+            // hasn't been returned to warehouse).
+            if (existedBefore) {
+                if (dCons !== 0) stockAdjustments.push({ productId: ni.product.id, delta: -dCons, product: ni.product });
+            } else if (ni.prepared > 0) {
+                stockAdjustments.push({ productId: ni.product.id, delta: -ni.prepared, product: ni.product });
+            }
         }
 
         for (const oldId of Object.keys(oldTotals)) {
