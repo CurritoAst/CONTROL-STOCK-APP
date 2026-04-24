@@ -21,6 +21,7 @@ interface AppContextType extends AppState {
     removeEvent: (id: string) => Promise<void>;
     refreshData: () => Promise<void>;
     updatePedidoItems: (logId: string, items: { product: Product, prepared: number }[]) => Promise<void>;
+    editHistoricalLog: (logId: string, items: { product: Product, prepared: number, consumed: number }[]) => Promise<void>;
     repairPendingStock: () => Promise<number>;
     duplicateDailyLog: (sourceLogId: string, newDate: string) => Promise<void>;
     isPushEnabled: boolean;
@@ -568,6 +569,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return fixed;
     };
 
+    const editHistoricalLog = async (
+        logId: string,
+        newItems: { product: Product, prepared: number, consumed: number }[]
+    ): Promise<void> => {
+        const currentLog = state.historicalLogs.find(l => l.id === logId) || state.activeLogs.find(l => l.id === logId);
+        if (!currentLog) throw new Error('Pedido no encontrado');
+
+        for (const item of newItems) {
+            if (item.consumed > item.prepared) {
+                throw new Error(`"${item.product.name}": el consumido no puede ser mayor que el preparado`);
+            }
+            if (item.prepared < 0 || item.consumed < 0) {
+                throw new Error(`"${item.product.name}": los valores no pueden ser negativos`);
+            }
+        }
+
+        // For APPROVED/CLOSED logs the stock already reflects -consumed (prepared was
+        // discounted at open, leftover returned at close). Only consumed delta matters.
+        for (const newItem of newItems) {
+            const oldItem = currentLog.items.find(i => i.product.id === newItem.product.id);
+            const oldConsumed = oldItem?.consumed ?? 0;
+            const consumedDelta = newItem.consumed - oldConsumed;
+
+            if (consumedDelta !== 0) {
+                const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', newItem.product.id).single();
+                const currentStock = freshProduct?.stock ?? newItem.product.stock;
+                const newStock = Math.max(0, currentStock - consumedDelta);
+                await supabase.from('products').update({ stock: newStock }).eq('id', newItem.product.id);
+            }
+        }
+
+        // Removed items: refund their consumed units back to stock
+        for (const oldItem of currentLog.items) {
+            const stillExists = newItems.find(i => i.product.id === oldItem.product.id);
+            if (!stillExists && oldItem.consumed > 0) {
+                const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', oldItem.product.id).single();
+                const currentStock = freshProduct?.stock ?? oldItem.product.stock;
+                await supabase.from('products').update({ stock: currentStock + oldItem.consumed }).eq('id', oldItem.product.id);
+            }
+        }
+
+        const { error: deleteError } = await supabase.from('log_items').delete().eq('daily_log_id', logId);
+        if (deleteError) throw deleteError;
+
+        if (newItems.length > 0) {
+            const itemsToInsert = newItems.map(item => ({
+                daily_log_id: logId,
+                product_id: item.product.id,
+                prepared: item.prepared,
+                consumed: item.consumed
+            }));
+            const { error: itemsError } = await supabase.from('log_items').insert(itemsToInsert);
+            if (itemsError) throw itemsError;
+        }
+
+        await refreshData();
+    };
+
     const duplicateDailyLog = async (sourceLogId: string, newDate: string): Promise<void> => {
         const sourceLog = state.activeLogs.find(l => l.id === sourceLogId)
             || state.historicalLogs.find(l => l.id === sourceLogId);
@@ -615,6 +674,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             removeEvent,
             refreshData,
             updatePedidoItems,
+            editHistoricalLog,
             repairPendingStock,
             duplicateDailyLog,
             isPushEnabled,

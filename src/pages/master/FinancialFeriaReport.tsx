@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { sendViaGmail } from '../../lib/gmailSend';
+import { Product } from '../../types';
 
 const INVOICE_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -234,12 +235,79 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
     return email ? sendViaGmail(html, `Factura-Total-${order.title}.html`) : Promise.resolve(openInvoice(html));
 };
 
+type EditRow = { product: Product; prepared: number; consumed: number };
+
 export const FinancialFeriaReport: React.FC = () => {
-    const { historicalLogs } = useAppContext();
+    const { historicalLogs, products, editHistoricalLog } = useAppContext();
     const { addToast } = useToast();
     const [selectedOrderId, setSelectedOrderId] = useState<string>('');
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
     const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+    const [editing, setEditing] = useState<{ logId: string; date: string; title: string } | null>(null);
+    const [editRows, setEditRows] = useState<EditRow[]>([]);
+    const [editSearch, setEditSearch] = useState('');
+    const [addProductId, setAddProductId] = useState('');
+    const [addPrepared, setAddPrepared] = useState('');
+    const [addConsumed, setAddConsumed] = useState('');
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+    const openEditor = (logId: string, date: string, title: string) => {
+        const log = historicalLogs.find(l => l.id === logId);
+        if (!log) { addToast('No se encontró el pedido', 'error'); return; }
+        setEditing({ logId, date, title });
+        setEditRows(log.items.map(i => ({ product: i.product, prepared: i.prepared, consumed: i.consumed })));
+        setEditSearch('');
+        setAddProductId('');
+        setAddPrepared('');
+        setAddConsumed('');
+    };
+
+    const closeEditor = () => {
+        setEditing(null);
+        setEditRows([]);
+    };
+
+    const handleAddProduct = () => {
+        const prod = products.find(p => p.id === addProductId);
+        if (!prod) { addToast('Selecciona un producto', 'error'); return; }
+        if (editRows.some(r => r.product.id === prod.id)) {
+            addToast(`${prod.name} ya está en el pedido. Edítalo arriba.`, 'error');
+            return;
+        }
+        const prep = parseInt(addPrepared, 10) || 0;
+        const cons = parseInt(addConsumed, 10) || 0;
+        if (prep <= 0) { addToast('El preparado debe ser mayor que 0', 'error'); return; }
+        if (cons > prep) { addToast('Consumido no puede ser mayor que preparado', 'error'); return; }
+        setEditRows(rows => [...rows, { product: prod, prepared: prep, consumed: cons }]);
+        setAddProductId('');
+        setAddPrepared('');
+        setAddConsumed('');
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editing) return;
+        const validRows = editRows.filter(r => r.prepared > 0);
+        if (validRows.length === 0) { addToast('El pedido debe tener al menos un producto', 'error'); return; }
+        setIsSavingEdit(true);
+        try {
+            await editHistoricalLog(editing.logId, validRows);
+            addToast('Pedido actualizado correctamente', 'success');
+            closeEditor();
+        } catch (e: any) {
+            addToast('Error al guardar: ' + (e.message || 'inténtalo de nuevo'), 'error');
+        } finally {
+            setIsSavingEdit(false);
+        }
+    };
+
+    const availableToAdd = useMemo(() => {
+        const usedIds = new Set(editRows.map(r => r.product.id));
+        return products.filter(p => !usedIds.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+    }, [products, editRows]);
+
+    const filteredEditRows = editSearch.trim() === ''
+        ? editRows
+        : editRows.filter(r => r.product.name.toLowerCase().includes(editSearch.trim().toLowerCase()));
 
     const handleEmail = async (fn: () => Promise<void>, key: string) => {
         setSendingEmail(key);
@@ -269,7 +337,10 @@ export const FinancialFeriaReport: React.FC = () => {
 
             logs.forEach(log => {
                 if (!dailyBreakdown[log.date]) {
-                    dailyBreakdown[log.date] = { date: log.date, expense: 0, loss: 0, items: [] };
+                    dailyBreakdown[log.date] = { date: log.date, expense: 0, loss: 0, items: [], logIds: [] };
+                }
+                if (!dailyBreakdown[log.date].logIds.includes(log.id)) {
+                    dailyBreakdown[log.date].logIds.push(log.id);
                 }
 
                 log.items.forEach(item => {
@@ -339,6 +410,7 @@ export const FinancialFeriaReport: React.FC = () => {
     }, {} as Record<string, { title: string, display: string }[]>);
 
     return (
+        <>
         <div className="animate-fade-in space-y-8 mt-6">
             <div className="card">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -458,7 +530,7 @@ export const FinancialFeriaReport: React.FC = () => {
                                                         <td className="p-3 font-bold">{day.expense.toLocaleString('es-ES')} €</td>
                                                         <td className="p-3 text-center text-accent-red font-bold">{day.loss.toLocaleString('es-ES')} €</td>
                                                         <td className="p-3 text-right">
-                                                            <div className="flex gap-2 justify-end">
+                                                            <div className="flex gap-2 justify-end flex-wrap">
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); downloadDayInvoice(day, selectedOrder.title); }}
                                                                     className="text-[11px] px-3 py-1 rounded border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-all font-bold"
@@ -472,6 +544,18 @@ export const FinancialFeriaReport: React.FC = () => {
                                                                 >
                                                                     {sendingEmail === day.date ? '⏳ Enviando...' : '✉️ Email'}
                                                                 </button>
+                                                                {day.logIds.length === 1 ? (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); openEditor(day.logIds[0], day.date, selectedOrder.title); }}
+                                                                        className="text-[11px] px-3 py-1 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold"
+                                                                    >
+                                                                        ✏️ Editar
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-[10px] px-2 py-1 text-text-muted italic" title="Hay múltiples pedidos en este día; edítalos individualmente desde Pedidos Diarios">
+                                                                        {day.logIds.length} pedidos
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -530,5 +614,174 @@ export const FinancialFeriaReport: React.FC = () => {
                 </div>
             )}
         </div>
+
+        {/* ─── Edit Historical Log Modal ─── */}
+        {editing && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+                <div className="bg-bg-elevated border border-white/10 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+                    {/* Header */}
+                    <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                            <div className="section-label mb-1">Editar pedido cerrado</div>
+                            <h3 className="text-xl font-bold truncate" title={editing.title}>{editing.title}</h3>
+                            <p className="text-sm text-text-muted mt-0.5">Día de servicio: <strong className="text-white">{editing.date}</strong></p>
+                        </div>
+                        <button
+                            className="text-text-muted hover:text-white transition-colors p-1 text-lg shrink-0"
+                            onClick={closeEditor}
+                            disabled={isSavingEdit}
+                            title="Cerrar"
+                        >✕</button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                        <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-3 text-xs text-text-secondary">
+                            <span className="text-accent-blue font-bold">ℹ️</span>{' '}
+                            Sólo el consumido afecta al stock en pedidos cerrados. Si cambias el preparado, solo modificas la factura.
+                        </div>
+
+                        {/* Search over existing items */}
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Buscar producto del pedido..."
+                                value={editSearch}
+                                onChange={e => setEditSearch(e.target.value)}
+                                className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-3 pl-10 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
+                            />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">🔍</span>
+                            {editSearch && (
+                                <button
+                                    onClick={() => setEditSearch('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm"
+                                >✕</button>
+                            )}
+                        </div>
+
+                        {/* Existing items */}
+                        <div>
+                            <div className="section-label mb-2">Productos del pedido ({editRows.length})</div>
+                            <div className="flex flex-col gap-2">
+                                {filteredEditRows.length === 0 && (
+                                    <div className="text-sm text-text-muted italic text-center py-6">
+                                        {editSearch ? `No hay coincidencias con "${editSearch}".` : 'El pedido no tiene productos.'}
+                                    </div>
+                                )}
+                                {filteredEditRows.map(row => {
+                                    const rowIdx = editRows.findIndex(r => r.product.id === row.product.id);
+                                    return (
+                                        <div key={row.product.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-black/30 border border-white/5 rounded-xl">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold truncate" title={row.product.name}>{row.product.name}</div>
+                                                <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">{row.product.category || 'General'}</div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <label className="flex flex-col items-center">
+                                                    <span className="text-[9px] font-bold uppercase text-text-muted tracking-wider mb-0.5">Preparado</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={row.prepared}
+                                                        onChange={e => {
+                                                            const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                                            setEditRows(rows => rows.map((r, i) => i === rowIdx ? { ...r, prepared: val } : r));
+                                                        }}
+                                                        className="w-20 text-center text-sm font-bold p-1.5 rounded border border-white/10 bg-bg-primary/60 outline-none focus:border-accent-blue"
+                                                    />
+                                                </label>
+                                                <label className="flex flex-col items-center">
+                                                    <span className="text-[9px] font-bold uppercase text-accent-blue tracking-wider mb-0.5">Consumido</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={row.prepared}
+                                                        value={row.consumed}
+                                                        onChange={e => {
+                                                            const val = Math.max(0, Math.min(row.prepared, parseInt(e.target.value, 10) || 0));
+                                                            setEditRows(rows => rows.map((r, i) => i === rowIdx ? { ...r, consumed: val } : r));
+                                                        }}
+                                                        className="w-20 text-center text-sm font-bold p-1.5 rounded border border-accent-blue/40 bg-accent-blue/10 text-accent-blue outline-none focus:border-accent-blue"
+                                                    />
+                                                </label>
+                                                <div className="text-center">
+                                                    <span className="text-[9px] font-bold uppercase text-accent-red tracking-wider block">Sobrante</span>
+                                                    <span className="text-sm font-bold text-accent-red">{Math.max(0, row.prepared - row.consumed)}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => setEditRows(rows => rows.filter((_, i) => i !== rowIdx))}
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent-red/10 border border-accent-red/20 text-accent-red hover:bg-accent-red/20 text-sm"
+                                                    title="Quitar"
+                                                >🗑</button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Add new product */}
+                        <div className="border-t border-white/5 pt-5">
+                            <div className="section-label mb-2">Añadir producto al pedido</div>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <select
+                                    value={addProductId}
+                                    onChange={e => setAddProductId(e.target.value)}
+                                    className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-accent-blue text-sm"
+                                >
+                                    <option value="">-- Selecciona producto --</option>
+                                    {availableToAdd.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name} ({p.category || 'General'})</option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={addPrepared}
+                                    onChange={e => setAddPrepared(e.target.value)}
+                                    placeholder="Prep."
+                                    className="w-20 sm:w-24 bg-bg-primary/50 border border-white/20 rounded-lg p-2.5 text-white text-center text-sm outline-none focus:border-accent-blue"
+                                />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={addConsumed}
+                                    onChange={e => setAddConsumed(e.target.value)}
+                                    placeholder="Cons."
+                                    className="w-20 sm:w-24 bg-bg-primary/50 border border-accent-blue/40 rounded-lg p-2.5 text-accent-blue text-center text-sm outline-none focus:border-accent-blue"
+                                />
+                                <button
+                                    onClick={handleAddProduct}
+                                    disabled={!addProductId || !addPrepared}
+                                    className="btn btn-outline border-accent-green/40 text-accent-green hover:bg-accent-green/10 shrink-0 disabled:opacity-50 text-xs py-2.5"
+                                >
+                                    + Añadir
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-text-muted mt-2">Al añadir un producto se descontará del stock por la cantidad consumida.</p>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-6 border-t border-white/10 flex gap-3">
+                        <button
+                            className="btn btn-outline flex-1"
+                            onClick={closeEditor}
+                            disabled={isSavingEdit}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn btn-primary flex-1 disabled:opacity-50"
+                            onClick={handleSaveEdit}
+                            disabled={isSavingEdit}
+                        >
+                            {isSavingEdit ? '⏳ Guardando...' : '💾 Guardar Cambios'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
