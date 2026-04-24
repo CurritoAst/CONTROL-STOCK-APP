@@ -256,17 +256,7 @@ export const FinancialFeriaReport: React.FC = () => {
     const orderStats = useMemo(() => {
         const stats: Record<string, any> = {};
 
-        const isGenericFeria = (title: string) => {
-            const genericNames = [
-                'Feria de Guadalcacín', 'Feria de Jerez', 'Feria de Tarifa',
-                'Feria de paterna', 'Feria de torrecera', 'Feria de San Fernando',
-                'Feria de Algeciras', 'Feria de Chipiona'
-            ];
-            return genericNames.some(name => title === name) || (title.startsWith('Feria de') && !title.includes(' - Caseta: '));
-        };
-
-        const uniqueTitles = Array.from(new Set(historicalLogs.map(log => log.eventTitle || 'Pedido General')))
-            .filter(title => !isGenericFeria(title));
+        const uniqueTitles = Array.from(new Set(historicalLogs.map(log => log.eventTitle || 'Pedido General')));
 
         uniqueTitles.forEach(title => {
             let expense = 0;
@@ -338,6 +328,10 @@ export const FinancialFeriaReport: React.FC = () => {
             const parts = title.split(' - Caseta: ');
             group = parts[0];
             display = parts[1];
+        } else if (/^Feria\s+de\s+/i.test(title)) {
+            // Admin created orders titled directly "Feria de X" without caseta
+            group = title;
+            display = 'Caseta Principal';
         }
         if (!acc[group]) acc[group] = [];
         acc[group].push({ title, display });
