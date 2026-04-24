@@ -11,11 +11,15 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
     const [quantities, setQuantities] = useState<Record<string, number>>({});
     const [selectedCategory, setSelectedCategory] = useState<string>('General');
     const [isSaving, setIsSaving] = useState(false);
+    const [search, setSearch] = useState('');
 
     const LOW_STOCK = 5;
 
     const allCategories = ['General', ...Array.from(new Set(products.map(p => p.category || 'General').filter(c => c !== 'General')))];
-    const filteredProducts = products.filter(p => selectedCategory === 'General' || (p.category || 'General') === selectedCategory);
+    const filteredProducts = products.filter(p =>
+        (selectedCategory === 'General' || (p.category || 'General') === selectedCategory) &&
+        (search.trim() === '' || p.name.toLowerCase().includes(search.trim().toLowerCase()))
+    );
 
     const lowStockCount = products.filter(p => {
         const avail = p.stock - (p.reserved || 0);
@@ -64,23 +68,42 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
         <div className="animate-fade-in">
             {/* Header */}
             <div className="card mb-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                     <div>
                         <h2 className="text-2xl font-bold mb-0.5">🍽️ Pedido del Día</h2>
                         <p className="text-text-muted text-sm">
                             {eventTitle ? <span className="text-accent-blue font-semibold">{eventTitle}</span> : 'Pedido General'} &mdash; <strong>{selectedDate}</strong>
                         </p>
                     </div>
-                    {/* Category filter — same as master catalog */}
-                    <select
-                        value={selectedCategory}
-                        onChange={e => setSelectedCategory(e.target.value)}
-                        className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-auto"
-                    >
-                        {allCategories.map(cat => (
-                            <option key={cat} value={cat}>{cat === 'General' ? 'Todas las Categorías' : cat}</option>
-                        ))}
-                    </select>
+                    {/* Search + Category filter */}
+                    <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                        <div className="relative flex-1 sm:flex-initial">
+                            <input
+                                type="text"
+                                placeholder="Buscar producto..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full sm:w-56 bg-bg-primary/50 border border-white/20 rounded p-2 pl-9 text-white outline-none focus:border-accent-blue placeholder:text-text-muted"
+                            />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">🔍</span>
+                            {search && (
+                                <button
+                                    onClick={() => setSearch('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm px-1"
+                                    title="Limpiar búsqueda"
+                                >✕</button>
+                            )}
+                        </div>
+                        <select
+                            value={selectedCategory}
+                            onChange={e => setSelectedCategory(e.target.value)}
+                            className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-auto"
+                        >
+                            {allCategories.map(cat => (
+                                <option key={cat} value={cat}>{cat === 'General' ? 'Todas las Categorías' : cat}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -106,7 +129,11 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
             <div className="card mb-4">
                 <div className="space-y-1">
                     {filteredProducts.length === 0 && (
-                        <p className="text-text-muted text-center py-8">No hay productos en esta categoría.</p>
+                        <p className="text-text-muted text-center py-8">
+                            {search.trim() !== ''
+                                ? `No hay productos que coincidan con "${search}".`
+                                : 'No hay productos en esta categoría.'}
+                        </p>
                     )}
                     {filteredProducts.map((product, idx) => {
                         const availableStock = product.stock - (product.reserved || 0);
