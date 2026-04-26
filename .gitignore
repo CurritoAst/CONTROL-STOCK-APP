@@ -33,3 +33,8 @@ push-test-output.txt
 
 .vercel
 .env*.local
+
+# Backup snapshots & restore data files (production data, keep local)
+scripts/restore-data.json
+scripts/pre-restore-*.json
+scripts/backup-*.json
