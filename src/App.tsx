@@ -17,7 +17,7 @@ const FallbackLoader = () => (
 
 const App: React.FC = () => {
   const { role } = useAppContext();
-  const [masterTab, setMasterTab] = useState<'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE'>('PANEL');
+  const [masterTab, setMasterTab] = useState<'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE' | 'BACKUPS'>('PANEL');
   const [employeeTab, setEmployeeTab] = useState<'PEDIDO' | 'REPORTES'>('PEDIDO');
 
   if (!role) {

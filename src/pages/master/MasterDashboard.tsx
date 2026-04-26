@@ -6,12 +6,13 @@ import { MasterCalendar } from './MasterCalendar';
 import { PointOfSale } from './PointOfSale';
 import { FinancialFeriaReport } from './FinancialFeriaReport';
 import { EmployeeDashboard } from '../employee/EmployeeDashboard';
+import { BackupsPanel } from './BackupsPanel';
 import { useAppContext } from '../../context/AppContext';
 import { supabase } from '../../lib/supabaseClient';
 
 export const MasterDashboard: React.FC<{
-    activeTab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE';
-    onTabChange: (tab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE') => void;
+    activeTab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE' | 'BACKUPS';
+    onTabChange: (tab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE' | 'BACKUPS') => void;
 }> = ({ activeTab, onTabChange }) => {
     const { historicalLogs, activeLogs, deleteDailyLog, isPushEnabled, requestPushPermission } = useAppContext();
     const [isBackingUp, setIsBackingUp] = useState(false);
@@ -113,6 +114,12 @@ export const MasterDashboard: React.FC<{
                     onClick={() => onTabChange('CREATE')}
                 >
                     🗂 Gestión Diaria
+                </button>
+                <button
+                    className={`btn ${activeTab === 'BACKUPS' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => onTabChange('BACKUPS')}
+                >
+                    💾 Copias de Seguridad
                 </button>
             </div>
 
@@ -346,6 +353,7 @@ export const MasterDashboard: React.FC<{
                     <EmployeeDashboard />
                 </div>
             )}
+            {activeTab === 'BACKUPS' && <BackupsPanel />}
         </div>
     );
 };

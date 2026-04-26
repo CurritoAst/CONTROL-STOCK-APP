@@ -47,6 +47,12 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
             items: [
                 { id: 'ANALYTICS', label: 'Control de Pérdidas', icon: '📈', shortLabel: 'Pérdidas' },
             ]
+        },
+        {
+            section: 'Sistema',
+            items: [
+                { id: 'BACKUPS', label: 'Copias de Seguridad', icon: '💾', shortLabel: 'Backups' },
+            ]
         }
     ];
 

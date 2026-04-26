@@ -39,3 +39,33 @@ export interface AppState {
   activeLogs: DailyLog[]; // Array mapping dates to their active logs (PENDING_PEDIDO, OPEN, CLOSED)
   historicalLogs: DailyLog[]; // Approved/Past logs for master dashboard
 }
+
+export type BackupTrigger =
+  | 'manual'
+  | 'auto-approve'
+  | 'auto-reject'
+  | 'auto-edit-historical'
+  | 'auto-edit-total'
+  | 'auto-delete'
+  | 'auto-restore'
+  | 'scheduled';
+
+export interface BackupSnapshot {
+  id: string;
+  created_at: string;
+  label: string | null;
+  trigger_type: BackupTrigger;
+  description: string | null;
+  products_count: number | null;
+  events_count: number | null;
+  daily_logs_count: number | null;
+  log_items_count: number | null;
+  size_bytes: number | null;
+  payload?: {
+    fecha: string;
+    products: Product[];
+    events: EventType[];
+    daily_logs: any[];
+    log_items: any[];
+  };
+}

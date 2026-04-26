@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AppState, Role, Product, DailyLog, InventoryItem, EventType } from '../types';
+import { AppState, Role, Product, DailyLog, InventoryItem, EventType, BackupSnapshot, BackupTrigger } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { createClient } from '@supabase/supabase-js';
 import { useToast } from './ToastContext';
@@ -25,6 +25,10 @@ interface AppContextType extends AppState {
     editOrderTotal: (eventTitle: string, items: { product: Product, prepared: number, consumed: number }[]) => Promise<void>;
     repairPendingStock: () => Promise<number>;
     duplicateDailyLog: (sourceLogId: string, newDate: string) => Promise<void>;
+    listBackups: () => Promise<BackupSnapshot[]>;
+    createBackup: (label: string, triggerType?: BackupTrigger, description?: string) => Promise<BackupSnapshot | null>;
+    deleteBackup: (id: string) => Promise<void>;
+    restoreFromBackup: (id: string) => Promise<void>;
     isPushEnabled: boolean;
     requestPushPermission: () => Promise<boolean>;
 }
@@ -384,12 +388,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const rejectPedido = async (id: string) => {
+        await createBackup('Antes de rechazar pedido', 'auto-reject', `log ${id}`);
         const { error } = await supabase.from('daily_logs').update({ status: 'REJECTED' }).eq('id', id);
         if (error) throw error;
         await refreshData();
     };
 
     const deleteDailyLog = async (id: string) => {
+        await createBackup('Antes de borrar pedido', 'auto-delete', `log ${id}`);
         const { error } = await supabase.from('daily_logs').delete().eq('id', id);
         if (error) throw error;
         await refreshData();
@@ -440,6 +446,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const approveDailyLog = async (id: string) => {
         const log = state.activeLogs.find(l => l.id === id) || state.historicalLogs.find(l => l.id === id);
+        await createBackup('Antes de aprobar servicio', 'auto-approve', `${log?.date || ''} ${log?.eventTitle || ''}`.trim());
         const { error } = await supabase.from('daily_logs').update({ status: 'APPROVED' }).eq('id', id);
         if (error) throw error;
 
@@ -576,6 +583,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ): Promise<void> => {
         const currentLog = state.historicalLogs.find(l => l.id === logId) || state.activeLogs.find(l => l.id === logId);
         if (!currentLog) throw new Error('Pedido no encontrado');
+        await createBackup('Antes de editar pedido cerrado', 'auto-edit-historical', `${currentLog.date} ${currentLog.eventTitle || ''}`.trim());
 
         for (const item of newItems) {
             if (item.consumed > item.prepared) {
@@ -640,6 +648,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         eventTitle: string,
         newItems: { product: Product, prepared: number, consumed: number }[]
     ): Promise<void> => {
+        await createBackup('Antes de editar total del evento', 'auto-edit-total', eventTitle);
         const normalizedTitle = eventTitle === 'Pedido General' ? '' : eventTitle;
         const orderLogs = state.historicalLogs
             .filter(l => (l.eventTitle || 'Pedido General') === eventTitle)
@@ -738,6 +747,121 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await refreshData();
     };
 
+    const listBackups = async (): Promise<BackupSnapshot[]> => {
+        const { data, error } = await supabase
+            .from('backups')
+            .select('id, created_at, label, trigger_type, description, products_count, events_count, daily_logs_count, log_items_count, size_bytes')
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error('Error listing backups:', error);
+            return [];
+        }
+        return (data as BackupSnapshot[]) || [];
+    };
+
+    const createBackup = async (
+        label: string,
+        triggerType: BackupTrigger = 'manual',
+        description?: string
+    ): Promise<BackupSnapshot | null> => {
+        try {
+            const [
+                { data: products },
+                { data: events },
+                { data: daily_logs },
+                { data: log_items }
+            ] = await Promise.all([
+                supabase.from('products').select('*'),
+                supabase.from('events').select('*'),
+                supabase.from('daily_logs').select('*'),
+                supabase.from('log_items').select('*')
+            ]);
+            const payload = {
+                fecha: new Date().toISOString(),
+                products: products || [],
+                events: events || [],
+                daily_logs: daily_logs || [],
+                log_items: log_items || []
+            };
+            const sizeBytes = JSON.stringify(payload).length;
+            const id = `bkp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const row = {
+                id,
+                created_at: payload.fecha,
+                label: label || null,
+                trigger_type: triggerType,
+                description: description || null,
+                payload,
+                products_count: payload.products.length,
+                events_count: payload.events.length,
+                daily_logs_count: payload.daily_logs.length,
+                log_items_count: payload.log_items.length,
+                size_bytes: sizeBytes,
+            };
+            const { error } = await supabase.from('backups').insert(row);
+            if (error) {
+                console.warn('Backup snapshot failed (table may not exist yet):', error.message);
+                return null;
+            }
+            return { ...row, payload: undefined } as BackupSnapshot;
+        } catch (e) {
+            console.warn('Backup snapshot failed:', e);
+            return null;
+        }
+    };
+
+    const deleteBackup = async (id: string): Promise<void> => {
+        const { error } = await supabase.from('backups').delete().eq('id', id);
+        if (error) throw error;
+    };
+
+    const restoreFromBackup = async (id: string): Promise<void> => {
+        const { data, error } = await supabase
+            .from('backups')
+            .select('payload')
+            .eq('id', id)
+            .single();
+        if (error) throw error;
+        const payload = (data as any).payload;
+        if (!payload) throw new Error('Backup sin datos');
+
+        // Create a safety snapshot before applying
+        await createBackup('Pre-restore safety', 'auto-restore', `Antes de restaurar ${id}`);
+
+        // Wipe and recreate everything
+        await supabase.from('log_items').delete().neq('id', '___');
+        await supabase.from('daily_logs').delete().neq('id', '___');
+
+        const curEvents = await supabase.from('events').select('id');
+        const backupEventIds = new Set((payload.events || []).map((e: any) => e.id));
+        const eventsToDelete = (curEvents.data || []).filter((e: any) => !backupEventIds.has(e.id)).map((e: any) => e.id);
+        if (eventsToDelete.length > 0) {
+            await supabase.from('events').delete().in('id', eventsToDelete);
+        }
+
+        const curProducts = await supabase.from('products').select('id');
+        const backupProductIds = new Set((payload.products || []).map((p: any) => p.id));
+        const productsToDelete = (curProducts.data || []).filter((p: any) => !backupProductIds.has(p.id)).map((p: any) => p.id);
+        if (productsToDelete.length > 0) {
+            await supabase.from('products').delete().in('id', productsToDelete);
+        }
+
+        if (payload.products?.length) {
+            await supabase.from('products').upsert(payload.products);
+        }
+        if (payload.events?.length) {
+            await supabase.from('events').upsert(payload.events);
+        }
+        if (payload.daily_logs?.length) {
+            await supabase.from('daily_logs').insert(payload.daily_logs);
+        }
+        if (payload.log_items?.length) {
+            await supabase.from('log_items').insert(payload.log_items);
+        }
+
+        await refreshData();
+    };
+
     const duplicateDailyLog = async (sourceLogId: string, newDate: string): Promise<void> => {
         const sourceLog = state.activeLogs.find(l => l.id === sourceLogId)
             || state.historicalLogs.find(l => l.id === sourceLogId);
@@ -789,6 +913,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             editOrderTotal,
             repairPendingStock,
             duplicateDailyLog,
+            listBackups,
+            createBackup,
+            deleteBackup,
+            restoreFromBackup,
             isPushEnabled,
             requestPushPermission
         }}>

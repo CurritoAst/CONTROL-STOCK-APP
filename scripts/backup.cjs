@@ -13,7 +13,7 @@ const path = require('path');
 // ── Configuración ──────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://ikagbmbvsehdvbmspfwn.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_vAsF5VdMJ5xFYQ-CdetqIw_fldKtmxs';
-const BACKUP_DIR   = 'D:\\Backups-Macario';
+const BACKUP_DIR   = 'C:\\Users\\curri\\OneDrive\\Desktop\\Copias Maca';
 // ──────────────────────────────────────────────────────────────────────────────
 
 function fetchTable(table) {
