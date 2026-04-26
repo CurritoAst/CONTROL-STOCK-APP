@@ -421,6 +421,67 @@ export const FinancialFeriaReport: React.FC = () => {
         ? editRows
         : editRows.filter(r => r.product.name.toLowerCase().includes(editSearch.trim().toLowerCase()));
 
+    // ─── Real-time impact preview ────────────────────────────────────────
+    // Computes what would change in stock and in the financial panel if the
+    // current editRows were saved. Same formula as editHistoricalLog /
+    // editOrderTotal so the preview matches reality.
+    const editingOriginalItems = useMemo(() => {
+        if (editing) {
+            const log = historicalLogs.find(l => l.id === editing.logId);
+            return log ? log.items : [];
+        }
+        if (editingTotal) {
+            const logs = historicalLogs.filter(l => (l.eventTitle || 'Pedido General') === editingTotal.title);
+            const agg: Record<string, { product: Product; prepared: number; consumed: number }> = {};
+            logs.forEach(l => l.items.forEach(it => {
+                if (!agg[it.product.id]) agg[it.product.id] = { product: it.product, prepared: 0, consumed: 0 };
+                agg[it.product.id].prepared += it.prepared;
+                agg[it.product.id].consumed += it.consumed;
+            }));
+            return Object.values(agg);
+        }
+        return [] as { product: Product; prepared: number; consumed: number }[];
+    }, [editing, editingTotal, historicalLogs]);
+
+    const impact = useMemo(() => {
+        const stockChanges: { name: string; delta: number; isNew: boolean }[] = [];
+        let expenseDelta = 0;
+        let lossDelta = 0;
+
+        for (const newItem of editRows) {
+            const oldItem = editingOriginalItems.find(o => o.product.id === newItem.product.id);
+            const oldCons = oldItem?.consumed ?? 0;
+            const oldPrep = oldItem?.prepared ?? 0;
+            const price = newItem.product.price;
+
+            expenseDelta += (newItem.consumed - oldCons) * price;
+            lossDelta += ((newItem.prepared - newItem.consumed) - (oldPrep - oldCons)) * price;
+
+            if (oldItem) {
+                const d = -(newItem.consumed - oldCons);
+                if (d !== 0) stockChanges.push({ name: newItem.product.name, delta: d, isNew: false });
+            } else if (newItem.prepared > 0) {
+                stockChanges.push({ name: newItem.product.name, delta: -newItem.prepared, isNew: true });
+            }
+        }
+
+        for (const oldItem of editingOriginalItems) {
+            const stillExists = editRows.find(r => r.product.id === oldItem.product.id);
+            if (!stillExists) {
+                const price = oldItem.product.price;
+                expenseDelta -= oldItem.consumed * price;
+                lossDelta -= (oldItem.prepared - oldItem.consumed) * price;
+                if (oldItem.consumed > 0) {
+                    stockChanges.push({ name: oldItem.product.name, delta: oldItem.consumed, isNew: false });
+                }
+            }
+        }
+
+        return { stockChanges, expenseDelta, lossDelta };
+    }, [editRows, editingOriginalItems]);
+
+    const hasChanges = impact.stockChanges.length > 0 || impact.expenseDelta !== 0 || impact.lossDelta !== 0;
+
     const handleEmail = async (fn: () => Promise<void>, key: string) => {
         setSendingEmail(key);
         try {
@@ -941,6 +1002,35 @@ export const FinancialFeriaReport: React.FC = () => {
                         </div>
                     </div>
 
+                    {hasChanges && (
+                        <div className="px-6 pt-3 pb-2 border-t border-white/5 bg-bg-primary/30">
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                <div className="section-label text-accent-blue">📊 Vista previa al guardar</div>
+                                <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wider">
+                                    <span>Δ Consumo: <span className={impact.expenseDelta > 0 ? 'text-accent-red' : impact.expenseDelta < 0 ? 'text-accent-green' : 'text-text-muted'}>
+                                        {impact.expenseDelta > 0 ? '+' : ''}{impact.expenseDelta.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €
+                                    </span></span>
+                                    <span>Δ Merma: <span className={impact.lossDelta > 0 ? 'text-accent-red' : impact.lossDelta < 0 ? 'text-accent-green' : 'text-text-muted'}>
+                                        {impact.lossDelta > 0 ? '+' : ''}{impact.lossDelta.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €
+                                    </span></span>
+                                </div>
+                            </div>
+                            {impact.stockChanges.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 text-[10px] pb-2">
+                                    <span className="text-text-muted font-bold uppercase mr-1">Stock:</span>
+                                    {impact.stockChanges.slice(0, 8).map((c, i) => (
+                                        <span key={i} className={`px-2 py-0.5 rounded font-bold ${c.delta < 0 ? 'bg-accent-red/15 text-accent-red' : 'bg-accent-green/15 text-accent-green'}`}>
+                                            {c.name}: {c.delta > 0 ? '+' : ''}{c.delta}{c.isNew ? ' (nuevo)' : ''}
+                                        </span>
+                                    ))}
+                                    {impact.stockChanges.length > 8 && (
+                                        <span className="text-text-muted">+{impact.stockChanges.length - 8} más</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="p-6 border-t border-white/10 flex gap-3">
                         <button
                             className="btn btn-outline flex-1"
@@ -1170,6 +1260,35 @@ export const FinancialFeriaReport: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {hasChanges && (
+                        <div className="px-6 pt-3 pb-2 border-t border-white/5 bg-bg-primary/30">
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                <div className="section-label text-accent-blue">📊 Vista previa al guardar</div>
+                                <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wider">
+                                    <span>Δ Consumo: <span className={impact.expenseDelta > 0 ? 'text-accent-red' : impact.expenseDelta < 0 ? 'text-accent-green' : 'text-text-muted'}>
+                                        {impact.expenseDelta > 0 ? '+' : ''}{impact.expenseDelta.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €
+                                    </span></span>
+                                    <span>Δ Merma: <span className={impact.lossDelta > 0 ? 'text-accent-red' : impact.lossDelta < 0 ? 'text-accent-green' : 'text-text-muted'}>
+                                        {impact.lossDelta > 0 ? '+' : ''}{impact.lossDelta.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €
+                                    </span></span>
+                                </div>
+                            </div>
+                            {impact.stockChanges.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 text-[10px] pb-2">
+                                    <span className="text-text-muted font-bold uppercase mr-1">Stock:</span>
+                                    {impact.stockChanges.slice(0, 8).map((c, i) => (
+                                        <span key={i} className={`px-2 py-0.5 rounded font-bold ${c.delta < 0 ? 'bg-accent-red/15 text-accent-red' : 'bg-accent-green/15 text-accent-green'}`}>
+                                            {c.name}: {c.delta > 0 ? '+' : ''}{c.delta}{c.isNew ? ' (nuevo)' : ''}
+                                        </span>
+                                    ))}
+                                    {impact.stockChanges.length > 8 && (
+                                        <span className="text-text-muted">+{impact.stockChanges.length - 8} más</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Footer */}
                     <div className="p-6 border-t border-white/10 flex gap-3">
