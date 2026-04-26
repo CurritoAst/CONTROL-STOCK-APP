@@ -747,16 +747,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await refreshData();
     };
 
+    // ─── Backups storage in localStorage ─────────────────────────────────
+    // Each backup row stored as `macario_backup_<id>` with the full payload.
+    // Index of all backup ids stored at `macario_backups_index`.
+    // Cap at 30 most recent to avoid quota issues (~3MB total).
+    const BACKUP_KEY_PREFIX = 'macario_backup_';
+    const BACKUP_INDEX_KEY = 'macario_backups_index';
+    const BACKUP_MAX = 30;
+
+    const readBackupIndex = (): string[] => {
+        try {
+            const raw = localStorage.getItem(BACKUP_INDEX_KEY);
+            return raw ? JSON.parse(raw) : [];
+        } catch { return []; }
+    };
+
+    const writeBackupIndex = (ids: string[]) => {
+        localStorage.setItem(BACKUP_INDEX_KEY, JSON.stringify(ids));
+    };
+
+    const readBackup = (id: string): any | null => {
+        try {
+            const raw = localStorage.getItem(BACKUP_KEY_PREFIX + id);
+            return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+    };
+
     const listBackups = async (): Promise<BackupSnapshot[]> => {
-        const { data, error } = await supabase
-            .from('backups')
-            .select('id, created_at, label, trigger_type, description, products_count, events_count, daily_logs_count, log_items_count, size_bytes')
-            .order('created_at', { ascending: false });
-        if (error) {
-            console.error('Error listing backups:', error);
-            return [];
+        const ids = readBackupIndex();
+        const items: BackupSnapshot[] = [];
+        for (const id of ids) {
+            const row = readBackup(id);
+            if (row) {
+                items.push({
+                    id: row.id,
+                    created_at: row.created_at,
+                    label: row.label,
+                    trigger_type: row.trigger_type,
+                    description: row.description,
+                    products_count: row.products_count,
+                    events_count: row.events_count,
+                    daily_logs_count: row.daily_logs_count,
+                    log_items_count: row.log_items_count,
+                    size_bytes: row.size_bytes,
+                });
+            }
         }
-        return (data as BackupSnapshot[]) || [];
+        return items.sort((a, b) => b.created_at.localeCompare(a.created_at));
     };
 
     const createBackup = async (
@@ -783,7 +820,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 daily_logs: daily_logs || [],
                 log_items: log_items || []
             };
-            const sizeBytes = JSON.stringify(payload).length;
+            const serialized = JSON.stringify(payload);
+            const sizeBytes = serialized.length;
             const id = `bkp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const row = {
                 id,
@@ -798,37 +836,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 log_items_count: payload.log_items.length,
                 size_bytes: sizeBytes,
             };
-            const { error } = await supabase.from('backups').insert(row);
-            if (error) {
-                console.warn('Backup snapshot failed (table may not exist yet):', error.message);
-                return null;
+
+            try {
+                localStorage.setItem(BACKUP_KEY_PREFIX + id, JSON.stringify(row));
+            } catch (storageErr) {
+                console.warn('Local storage quota exceeded, evicting oldest backup');
+                const idx = readBackupIndex();
+                if (idx.length > 0) {
+                    const oldestId = idx[idx.length - 1];
+                    localStorage.removeItem(BACKUP_KEY_PREFIX + oldestId);
+                    writeBackupIndex(idx.slice(0, -1));
+                    localStorage.setItem(BACKUP_KEY_PREFIX + id, JSON.stringify(row));
+                } else {
+                    throw storageErr;
+                }
             }
+
+            const idx = readBackupIndex();
+            const newIdx = [id, ...idx].slice(0, BACKUP_MAX);
+            // Evict any ids dropped from the cap
+            for (const dropped of idx.slice(BACKUP_MAX - 1)) {
+                if (!newIdx.includes(dropped)) localStorage.removeItem(BACKUP_KEY_PREFIX + dropped);
+            }
+            writeBackupIndex(newIdx);
+
             return { ...row, payload: undefined } as BackupSnapshot;
-        } catch (e) {
-            console.warn('Backup snapshot failed:', e);
+        } catch (e: any) {
+            console.warn('Backup snapshot failed:', e?.message || e);
             return null;
         }
     };
 
     const deleteBackup = async (id: string): Promise<void> => {
-        const { error } = await supabase.from('backups').delete().eq('id', id);
-        if (error) throw error;
+        localStorage.removeItem(BACKUP_KEY_PREFIX + id);
+        writeBackupIndex(readBackupIndex().filter(x => x !== id));
     };
 
     const restoreFromBackup = async (id: string): Promise<void> => {
-        const { data, error } = await supabase
-            .from('backups')
-            .select('payload')
-            .eq('id', id)
-            .single();
-        if (error) throw error;
-        const payload = (data as any).payload;
-        if (!payload) throw new Error('Backup sin datos');
+        const row = readBackup(id);
+        if (!row) throw new Error('Copia no encontrada');
+        const payload = row.payload;
+        if (!payload) throw new Error('Copia sin datos');
 
-        // Create a safety snapshot before applying
-        await createBackup('Pre-restore safety', 'auto-restore', `Antes de restaurar ${id}`);
+        // Safety snapshot before applying
+        await createBackup('Pre-restauración', 'auto-restore', `Antes de restaurar ${row.label || id}`);
 
-        // Wipe and recreate everything
         await supabase.from('log_items').delete().neq('id', '___');
         await supabase.from('daily_logs').delete().neq('id', '___');
 
@@ -846,18 +898,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             await supabase.from('products').delete().in('id', productsToDelete);
         }
 
-        if (payload.products?.length) {
-            await supabase.from('products').upsert(payload.products);
-        }
-        if (payload.events?.length) {
-            await supabase.from('events').upsert(payload.events);
-        }
-        if (payload.daily_logs?.length) {
-            await supabase.from('daily_logs').insert(payload.daily_logs);
-        }
-        if (payload.log_items?.length) {
-            await supabase.from('log_items').insert(payload.log_items);
-        }
+        if (payload.products?.length) await supabase.from('products').upsert(payload.products);
+        if (payload.events?.length) await supabase.from('events').upsert(payload.events);
+        if (payload.daily_logs?.length) await supabase.from('daily_logs').insert(payload.daily_logs);
+        if (payload.log_items?.length) await supabase.from('log_items').insert(payload.log_items);
 
         await refreshData();
     };

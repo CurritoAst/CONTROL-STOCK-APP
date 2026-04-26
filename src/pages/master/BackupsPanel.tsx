@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { BackupSnapshot, BackupTrigger } from '../../types';
-import { supabase } from '../../lib/supabaseClient';
 
 const TRIGGER_LABELS: Record<BackupTrigger, { label: string; color: string }> = {
     'manual':              { label: 'Manual',         color: 'bg-accent-blue/20 text-accent-blue border-accent-blue/30' },
@@ -48,8 +47,8 @@ export const BackupsPanel: React.FC = () => {
             setBackups(list);
             setTableMissing(false);
         } catch (e: any) {
-            console.warn('Backups table missing or no access:', e);
-            setTableMissing(true);
+            console.warn('Failed to read backups:', e);
+            setTableMissing(false); // localStorage always works
         } finally {
             setLoading(false);
         }
@@ -79,9 +78,10 @@ export const BackupsPanel: React.FC = () => {
     const handleDownload = async (backup: BackupSnapshot) => {
         setDownloadingId(backup.id);
         try {
-            const { data, error } = await supabase.from('backups').select('payload').eq('id', backup.id).single();
-            if (error) throw error;
-            const payload = (data as any).payload;
+            const raw = localStorage.getItem(`macario_backup_${backup.id}`);
+            if (!raw) throw new Error('Copia no encontrada en almacén local');
+            const row = JSON.parse(raw);
+            const payload = row.payload || row;
             const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -90,7 +90,7 @@ export const BackupsPanel: React.FC = () => {
             a.download = `backup-${ts}-${backup.trigger_type}.json`;
             a.click();
             URL.revokeObjectURL(url);
-            addToast('Descargado', 'success');
+            addToast('Descargado a Descargas', 'success');
         } catch (e: any) {
             addToast('Error al descargar: ' + (e.message || 'inténtalo de nuevo'), 'error');
         } finally {
