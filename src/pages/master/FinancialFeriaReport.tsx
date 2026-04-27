@@ -303,7 +303,7 @@ export const FinancialFeriaReport: React.FC = () => {
 
     const openTotalEditor = (title: string) => {
         const logs = historicalLogs
-            .filter(l => (l.eventTitle || 'Pedido General') === title)
+            .filter(l => stripExtraSuffix(l.eventTitle || 'Pedido General') === title)
             .sort((a, b) => a.date.localeCompare(b.date));
         if (logs.length === 0) { addToast('No hay pedidos para este evento', 'error'); return; }
 
@@ -431,7 +431,7 @@ export const FinancialFeriaReport: React.FC = () => {
             return log ? log.items : [];
         }
         if (editingTotal) {
-            const logs = historicalLogs.filter(l => (l.eventTitle || 'Pedido General') === editingTotal.title);
+            const logs = historicalLogs.filter(l => stripExtraSuffix(l.eventTitle || 'Pedido General') === editingTotal.title);
             const agg: Record<string, { product: Product; prepared: number; consumed: number }> = {};
             logs.forEach(l => l.items.forEach(it => {
                 if (!agg[it.product.id]) agg[it.product.id] = { product: it.product, prepared: 0, consumed: 0 };
@@ -494,60 +494,67 @@ export const FinancialFeriaReport: React.FC = () => {
         }
     };
 
+    // Strip a trailing " (Extra N)" suffix so extras get aggregated under
+    // their base caseta/order, instead of appearing as separate dropdown
+    // options.
+    const stripExtraSuffix = (title: string) => title.replace(/\s*\(Extra\s+\d+\)\s*$/i, '');
+
     const orderStats = useMemo(() => {
         const stats: Record<string, any> = {};
 
-        const uniqueTitles = Array.from(new Set(historicalLogs.map(log => log.eventTitle || 'Pedido General')));
+        historicalLogs.forEach(log => {
+            const fullTitle = log.eventTitle || 'Pedido General';
+            const baseTitle = stripExtraSuffix(fullTitle);
 
-        uniqueTitles.forEach(title => {
-            let expense = 0;
-            let loss = 0;
-            let preparedEur = 0;
-            const productTotals: Record<string, any> = {};
-            const dailyBreakdown: Record<string, any> = {};
+            if (!stats[baseTitle]) {
+                stats[baseTitle] = {
+                    title: baseTitle,
+                    expense: 0,
+                    loss: 0,
+                    preparedEur: 0,
+                    productTotals: {} as Record<string, any>,
+                    dailyBreakdown: {} as Record<string, any>,
+                };
+            }
+            const s = stats[baseTitle];
 
-            const logs = historicalLogs.filter(log => (log.eventTitle || 'Pedido General') === title);
+            if (!s.dailyBreakdown[log.date]) {
+                s.dailyBreakdown[log.date] = { date: log.date, expense: 0, loss: 0, items: [], logIds: [] };
+            }
+            if (!s.dailyBreakdown[log.date].logIds.includes(log.id)) {
+                s.dailyBreakdown[log.date].logIds.push(log.id);
+            }
 
-            logs.forEach(log => {
-                if (!dailyBreakdown[log.date]) {
-                    dailyBreakdown[log.date] = { date: log.date, expense: 0, loss: 0, items: [], logIds: [] };
+            log.items.forEach(item => {
+                const sobrante = Math.max(0, item.prepared - item.consumed);
+                const cost = item.consumed * item.product.price;
+                const lossEur = sobrante * item.product.price;
+                const prepVal = item.prepared * item.product.price;
+
+                s.expense += cost;
+                s.loss += lossEur;
+                s.preparedEur += prepVal;
+
+                if (!s.productTotals[item.product.id]) {
+                    s.productTotals[item.product.id] = { name: item.product.name, consumed: 0, loss: 0, cost: 0 };
                 }
-                if (!dailyBreakdown[log.date].logIds.includes(log.id)) {
-                    dailyBreakdown[log.date].logIds.push(log.id);
-                }
+                s.productTotals[item.product.id].consumed += item.consumed;
+                s.productTotals[item.product.id].loss += sobrante;
+                s.productTotals[item.product.id].cost += cost;
 
-                log.items.forEach(item => {
-                    const sobrante = Math.max(0, item.prepared - item.consumed);
-                    const cost = item.consumed * item.product.price;
-                    const lossEur = sobrante * item.product.price;
-                    const prepVal = item.prepared * item.product.price;
-
-                    expense += cost;
-                    loss += lossEur;
-                    preparedEur += prepVal;
-
-                    if (!productTotals[item.product.id]) {
-                        productTotals[item.product.id] = { name: item.product.name, consumed: 0, loss: 0, cost: 0 };
-                    }
-                    productTotals[item.product.id].consumed += item.consumed;
-                    productTotals[item.product.id].loss += sobrante;
-                    productTotals[item.product.id].cost += cost;
-
-                    dailyBreakdown[log.date].expense += cost;
-                    dailyBreakdown[log.date].loss += lossEur;
-                    dailyBreakdown[log.date].items.push(item);
-                });
+                s.dailyBreakdown[log.date].expense += cost;
+                s.dailyBreakdown[log.date].loss += lossEur;
+                s.dailyBreakdown[log.date].items.push(item);
             });
-
-            stats[title] = {
-                title,
-                expense,
-                loss,
-                efficiency: preparedEur > 0 ? Math.round((expense / preparedEur) * 100) : 0,
-                productTotals: Object.values(productTotals).sort((a: any, b: any) => b.cost - a.cost),
-                dailyBreakdown: Object.values(dailyBreakdown).sort((a: any, b: any) => a.date.localeCompare(b.date)),
-            };
         });
+
+        // Convert nested maps to sorted arrays for the UI.
+        for (const baseTitle in stats) {
+            const s = stats[baseTitle];
+            s.efficiency = s.preparedEur > 0 ? Math.round((s.expense / s.preparedEur) * 100) : 0;
+            s.productTotals = (Object.values(s.productTotals) as any[]).sort((a, b) => b.cost - a.cost);
+            s.dailyBreakdown = (Object.values(s.dailyBreakdown) as any[]).sort((a, b) => a.date.localeCompare(b.date));
+        }
 
         return stats;
     }, [historicalLogs]);

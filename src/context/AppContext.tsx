@@ -651,8 +651,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ): Promise<void> => {
         await createBackup('Antes de editar total del evento', 'auto-edit-total', eventTitle);
         const normalizedTitle = eventTitle === 'Pedido General' ? '' : eventTitle;
+        // Aggregate by base title (strip ' (Extra N)') so editing the merged
+        // 'Caballo' total considers main + every extra under it.
+        const stripExtra = (t: string) => t.replace(/\s*\(Extra\s+\d+\)\s*$/i, '');
         const orderLogs = state.historicalLogs
-            .filter(l => (l.eventTitle || 'Pedido General') === eventTitle)
+            .filter(l => stripExtra(l.eventTitle || 'Pedido General') === eventTitle)
             .sort((a, b) => a.date.localeCompare(b.date));
 
         if (orderLogs.length === 0) throw new Error('Pedido no encontrado');
