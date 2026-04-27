@@ -25,6 +25,7 @@ interface AppContextType extends AppState {
     editOrderTotal: (eventTitle: string, items: { product: Product, prepared: number, consumed: number }[]) => Promise<void>;
     repairPendingStock: () => Promise<number>;
     duplicateDailyLog: (sourceLogId: string, newDate: string) => Promise<void>;
+    assignExtraToFeria: (logId: string, feriaName: string) => Promise<void>;
     listBackups: () => Promise<BackupSnapshot[]>;
     createBackup: (label: string, triggerType?: BackupTrigger, description?: string) => Promise<BackupSnapshot | null>;
     deleteBackup: (id: string) => Promise<void>;
@@ -906,6 +907,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await refreshData();
     };
 
+    const assignExtraToFeria = async (logId: string, feriaName: string): Promise<void> => {
+        const trimmed = feriaName.trim();
+        if (!trimmed) throw new Error('Selecciona una feria');
+
+        const log = state.activeLogs.find(l => l.id === logId) || state.historicalLogs.find(l => l.id === logId);
+        if (!log) throw new Error('Pedido no encontrado');
+
+        await createBackup('Antes de asignar extra a feria', 'auto-edit-historical', `${log.date} → ${trimmed}`);
+
+        // Find next Extra number for this feria across all logs (active + historical)
+        const allLogs = [...state.activeLogs, ...state.historicalLogs];
+        const prefix = `${trimmed} - Caseta: Extra `;
+        let maxN = 0;
+        for (const l of allLogs) {
+            if (l.eventTitle?.startsWith(prefix)) {
+                const m = l.eventTitle.match(/Extra (\d+)$/);
+                if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+            }
+        }
+        const newTitle = `${trimmed} - Caseta: Extra ${maxN + 1}`;
+        const newLogId = `log-${Date.now()}---${newTitle}`;
+
+        // 1. Insert new log row (so log_items FK target exists)
+        const { error: insertErr } = await supabase
+            .from('daily_logs')
+            .insert({ id: newLogId, date: log.date, status: log.status });
+        if (insertErr) throw insertErr;
+
+        // 2. Re-point every log_item from old log id to new
+        const { error: updateErr } = await supabase
+            .from('log_items')
+            .update({ daily_log_id: newLogId })
+            .eq('daily_log_id', logId);
+        if (updateErr) {
+            // rollback the inserted log so we don't leave an orphan
+            await supabase.from('daily_logs').delete().eq('id', newLogId);
+            throw updateErr;
+        }
+
+        // 3. Delete old log row
+        const { error: delErr } = await supabase.from('daily_logs').delete().eq('id', logId);
+        if (delErr) throw delErr;
+
+        await refreshData();
+    };
+
     const duplicateDailyLog = async (sourceLogId: string, newDate: string): Promise<void> => {
         const sourceLog = state.activeLogs.find(l => l.id === sourceLogId)
             || state.historicalLogs.find(l => l.id === sourceLogId);
@@ -957,6 +1004,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             editOrderTotal,
             repairPendingStock,
             duplicateDailyLog,
+            assignExtraToFeria,
             listBackups,
             createBackup,
             deleteBackup,

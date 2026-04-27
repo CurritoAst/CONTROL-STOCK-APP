@@ -10,7 +10,7 @@ import { printRawOrder } from '../../lib/printUtils';
 
 
 export const DailyAudit: React.FC = () => {
-    const { activeLogs, products, approveDailyLog, approvePedido, rejectPedido, deleteDailyLog, updatePedidoItems, repairPendingStock, duplicateDailyLog } = useAppContext();
+    const { activeLogs, products, events = [], approveDailyLog, approvePedido, rejectPedido, deleteDailyLog, updatePedidoItems, repairPendingStock, duplicateDailyLog, assignExtraToFeria } = useAppContext();
     const { addToast } = useToast();
     const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
@@ -40,6 +40,14 @@ export const DailyAudit: React.FC = () => {
     const [duplicateModal, setDuplicateModal] = useState<{ logId: string; sourceDate: string } | null>(null);
     const [duplicateDate, setDuplicateDate] = useState('');
     const [isDuplicating, setIsDuplicating] = useState(false);
+    const [extraFeriaSelection, setExtraFeriaSelection] = useState<Record<string, string>>({});
+    const [assigningExtraId, setAssigningExtraId] = useState<string | null>(null);
+
+    const uniqueFeriaNames = React.useMemo(() => {
+        const names = new Set<string>();
+        events.filter(e => e.type === 'EVENT').forEach(e => names.add(e.title));
+        return Array.from(names).sort((a, b) => a.localeCompare(b, 'es'));
+    }, [events]);
 
     if (logsToAudit.length === 0) {
         return (
@@ -356,6 +364,56 @@ export const DailyAudit: React.FC = () => {
                                     })}
                                 </div>
                             </div>
+
+                            {(() => {
+                                const isExtra = !!log.eventTitle && /extra/i.test(log.eventTitle);
+                                const isAlreadyInFeria = !!log.eventTitle && log.eventTitle.includes(' - Caseta: Extra ');
+                                if (!isExtra || isAlreadyInFeria) return null;
+                                const selectedFeria = extraFeriaSelection[log.id] || '';
+                                const isAssigning = assigningExtraId === log.id;
+                                return (
+                                    <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-4 mb-4 animate-fade-in">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xl">🎪</span>
+                                            <div>
+                                                <p className="font-bold text-accent-blue text-sm">Asociar Pedido Extra a una feria</p>
+                                                <p className="text-[11px] text-text-muted">Sumará al total e integrará en la factura final del evento.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <select
+                                                value={selectedFeria}
+                                                onChange={e => setExtraFeriaSelection(s => ({ ...s, [log.id]: e.target.value }))}
+                                                disabled={isAssigning}
+                                                className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm disabled:opacity-50"
+                                            >
+                                                <option value="">-- Selecciona feria --</option>
+                                                {uniqueFeriaNames.map(name => (
+                                                    <option key={name} value={name}>{name}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                disabled={!selectedFeria || isAssigning}
+                                                onClick={async () => {
+                                                    setAssigningExtraId(log.id);
+                                                    try {
+                                                        await assignExtraToFeria(log.id, selectedFeria);
+                                                        addToast(`Extra asociado a "${selectedFeria}"`, 'success');
+                                                        setExtraFeriaSelection(s => { const n = { ...s }; delete n[log.id]; return n; });
+                                                    } catch (err: any) {
+                                                        addToast('Error al asociar: ' + (err.message || 'inténtalo de nuevo'), 'error');
+                                                    } finally {
+                                                        setAssigningExtraId(null);
+                                                    }
+                                                }}
+                                                className="btn btn-outline border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 disabled:opacity-50 text-xs px-4"
+                                            >
+                                                {isAssigning ? '⏳ Asociando...' : '🔗 Asociar a feria'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <button
                                 className="btn btn-success w-full text-lg py-4"
