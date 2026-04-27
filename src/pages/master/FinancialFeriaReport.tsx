@@ -739,9 +739,24 @@ export const FinancialFeriaReport: React.FC = () => {
                                                                         ✏️ Editar
                                                                     </button>
                                                                 ) : (
-                                                                    <span className="text-[10px] px-2 py-1 text-text-muted italic" title="Hay múltiples pedidos en este día; edítalos individualmente desde Pedidos Diarios">
-                                                                        {day.logIds.length} pedidos
-                                                                    </span>
+                                                                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                                                        {day.logIds.map((lid: string, idx: number) => {
+                                                                            const log = historicalLogs.find(l => l.id === lid);
+                                                                            const fullTitle = log?.eventTitle || '';
+                                                                            const extraMatch = fullTitle.match(/\(Extra\s+(\d+)\)\s*$/i);
+                                                                            const label = extraMatch ? `Extra ${extraMatch[1]}` : (idx === 0 ? 'Principal' : `#${idx + 1}`);
+                                                                            return (
+                                                                                <button
+                                                                                    key={lid}
+                                                                                    onClick={(e) => { e.stopPropagation(); openEditor(lid, day.date, selectedOrder.title); }}
+                                                                                    className="text-[10px] px-2 py-1 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold whitespace-nowrap"
+                                                                                    title={`Editar ${fullTitle}`}
+                                                                                >
+                                                                                    ✏️ {label}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         </td>
