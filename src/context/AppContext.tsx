@@ -25,7 +25,7 @@ interface AppContextType extends AppState {
     editOrderTotal: (eventTitle: string, items: { product: Product, prepared: number, consumed: number }[]) => Promise<void>;
     repairPendingStock: () => Promise<number>;
     duplicateDailyLog: (sourceLogId: string, newDate: string) => Promise<void>;
-    assignExtraToFeria: (logId: string, feriaName: string) => Promise<void>;
+    assignExtraToFeria: (logId: string, feriaName: string, casetaName?: string) => Promise<void>;
     listBackups: () => Promise<BackupSnapshot[]>;
     createBackup: (label: string, triggerType?: BackupTrigger, description?: string) => Promise<BackupSnapshot | null>;
     deleteBackup: (id: string) => Promise<void>;
@@ -907,26 +907,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await refreshData();
     };
 
-    const assignExtraToFeria = async (logId: string, feriaName: string): Promise<void> => {
-        const trimmed = feriaName.trim();
-        if (!trimmed) throw new Error('Selecciona una feria');
+    const assignExtraToFeria = async (logId: string, feriaName: string, casetaName?: string): Promise<void> => {
+        const trimmedFeria = feriaName.trim();
+        if (!trimmedFeria) throw new Error('Selecciona una feria');
+        const trimmedCaseta = (casetaName || '').trim();
 
         const log = state.activeLogs.find(l => l.id === logId) || state.historicalLogs.find(l => l.id === logId);
         if (!log) throw new Error('Pedido no encontrado');
 
-        await createBackup('Antes de asignar extra a feria', 'auto-edit-historical', `${log.date} → ${trimmed}`);
+        const summary = trimmedCaseta ? `${log.date} → ${trimmedFeria} / ${trimmedCaseta}` : `${log.date} → ${trimmedFeria}`;
+        await createBackup('Antes de asignar extra a feria', 'auto-edit-historical', summary);
 
-        // Find next Extra number for this feria across all logs (active + historical)
         const allLogs = [...state.activeLogs, ...state.historicalLogs];
-        const prefix = `${trimmed} - Caseta: Extra `;
-        let maxN = 0;
-        for (const l of allLogs) {
-            if (l.eventTitle?.startsWith(prefix)) {
-                const m = l.eventTitle.match(/Extra (\d+)$/);
+
+        // Build the destination title:
+        //  - With caseta: "Pedido <Feria> - Caseta: <Caseta> (Extra N)"
+        //    matches existing extras-within-caseta naming pattern.
+        //  - Without caseta: "<Feria> - Caseta: Extra N"
+        //    treats feria as a virtual caseta-less group.
+        let newTitle: string;
+        if (trimmedCaseta) {
+            const baseTitle = `Pedido ${trimmedFeria} - Caseta: ${trimmedCaseta}`;
+            const extraPattern = new RegExp(`^${baseTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(Extra (\\d+)\\)$`);
+            let maxN = 0;
+            for (const l of allLogs) {
+                const m = l.eventTitle?.match(extraPattern);
                 if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
             }
+            newTitle = `${baseTitle} (Extra ${maxN + 1})`;
+        } else {
+            const prefix = `${trimmedFeria} - Caseta: Extra `;
+            let maxN = 0;
+            for (const l of allLogs) {
+                if (l.eventTitle?.startsWith(prefix)) {
+                    const m = l.eventTitle.match(/Extra (\d+)$/);
+                    if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+                }
+            }
+            newTitle = `${trimmedFeria} - Caseta: Extra ${maxN + 1}`;
         }
-        const newTitle = `${trimmed} - Caseta: Extra ${maxN + 1}`;
         const newLogId = `log-${Date.now()}---${newTitle}`;
 
         // 1. Insert new log row (so log_items FK target exists)
