@@ -407,7 +407,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!currentLog) throw new Error("Log not found");
 
         const oldStatus = currentLog.status;
-        const { error: logError } = await supabase.from('daily_logs').update({ status: 'CLOSED' }).eq('id', id);
+
+        // Status transition:
+        //  - OPEN  -> CLOSED  (first time we register sobrantes)
+        //  - CLOSED -> CLOSED (re-running sobrantes before approval)
+        //  - APPROVED -> APPROVED (re-running on an already approved log;
+        //    keep it in historicalLogs so the financial panel still shows it)
+        //  - PENDING/REJECTED: untouched here, but transition to CLOSED to
+        //    keep the legacy behaviour predictable.
+        const targetStatus = oldStatus === 'APPROVED' ? 'APPROVED' : 'CLOSED';
+        const { error: logError } = await supabase.from('daily_logs').update({ status: targetStatus }).eq('id', id);
         if (logError) throw logError;
 
         for (const item of itemsWithConsumption) {
@@ -421,17 +430,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             let stockAdjustment = 0;
 
-            if (oldStatus === 'CLOSED') {
-                // Already closed: only handle the delta between old and new consumption
-                // If we consume LESS now, we return MORE to stock.
+            if (oldStatus === 'CLOSED' || oldStatus === 'APPROVED') {
+                // Sobrante already returned to warehouse at first close. Only the
+                // delta in consumed moves stock now (less consumed -> more back).
                 stockAdjustment = oldConsumed - item.consumed;
-            } else if (oldStatus === 'OPEN' || oldStatus === 'APPROVED') {
-                // Stock was already discounted by 'prepared' quantity in handleSaveOrder/updatePedidoItems
-                // We must refund the "leftover" (prepared - consumed)
+            } else if (oldStatus === 'OPEN') {
+                // First close: stock was discounted by 'prepared' at open time.
+                // Refund the leftover (prepared - consumed) to warehouse.
                 stockAdjustment = item.prepared - item.consumed;
             } else {
-                // PENDING_PEDIDO or REJECTED: Stock was NOT discounted yet.
-                // Subtract the full consumed amount.
+                // PENDING_PEDIDO / REJECTED: stock not yet discounted; deduct what
+                // was actually consumed.
                 stockAdjustment = -item.consumed;
             }
 
