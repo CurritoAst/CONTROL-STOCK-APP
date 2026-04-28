@@ -1,9 +1,11 @@
 // printUtils.ts
 // Utilidades de impresión para Proyecto Macario
 // El email se envía DESDE EL SERVIDOR (Supabase Edge Function) para funcionar en móvil sin popups OAuth.
+//
+// Email y print local usan EXACTAMENTE el mismo HTML, así que la factura
+// que llega a la impresora Brother es idéntica al preview del navegador.
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+import { sendViaGmail } from './gmailSend';
 
 export const ORDER_PRINT_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -27,44 +29,7 @@ export const ORDER_PRINT_STYLES = `
   @media print { body { padding: 16px; } @page { margin: 10mm; } }
 `;
 
-/**
- * Envía el pedido al servidor (Supabase Edge Function) para que lo mande
- * por email a la impresora Brother. Funciona en todos los dispositivos sin popups.
- */
-export const sendOrderToprinter = async (log: { date: string; eventTitle?: string; items: any[] }): Promise<void> => {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-print-email`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-            date: log.date,
-            eventTitle: log.eventTitle,
-            items: log.items.filter(i => i.prepared > 0).map(i => ({
-                product: { name: i.product.name, category: i.product.category || 'Sin categoría', price: i.product.price || 0 },
-                prepared: i.prepared,
-            })),
-        }),
-    });
-
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(err.error || 'Error al enviar el pedido a la impresora');
-    }
-};
-
-/**
- * Abre una ventana de impresión local en el navegador (solo PC/escritorio).
- * En móvil no hace nada para evitar crashes.
- */
-export const printRawOrder = (log: { date: string; eventTitle?: string; items: any[] }, email = false): Promise<void> => {
-    if (email) {
-        return sendOrderToprinter(log);
-    }
-
-    // Impresión local solo en escritorio
+const buildOrderHtml = (log: { date: string; eventTitle?: string; items: any[] }): string => {
     const byCategory: Record<string, typeof log.items> = {};
     log.items.filter(i => i.prepared > 0).forEach(item => {
         const cat = item.product.category || 'Sin categoría';
@@ -86,7 +51,7 @@ export const printRawOrder = (log: { date: string; eventTitle?: string; items: a
             </table>
         `).join('');
 
-    const html = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <title>Pedido - ${log.eventTitle || 'Pedido'} - ${log.date}</title>
 <style>${ORDER_PRINT_STYLES}</style></head>
@@ -115,6 +80,20 @@ export const printRawOrder = (log: { date: string; eventTitle?: string; items: a
   <div class="footer">Generado el ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
   <script>window.onload = function() { window.print(); }<\/script>
 </body></html>`;
+};
+
+/**
+ * Imprime o envía por email el pedido. Email y print local usan el mismo HTML.
+ * - email=false (default): abre ventana de impresión local del navegador.
+ * - email=true: envía el HTML a la impresora Brother vía Edge Function.
+ */
+export const printRawOrder = (log: { date: string; eventTitle?: string; items: any[] }, email = false): Promise<void> => {
+    const html = buildOrderHtml(log);
+
+    if (email) {
+        const safeTitle = (log.eventTitle || 'Pedido').replace(/[^\w\s-]/g, '_').slice(0, 60);
+        return sendViaGmail(html, `Pedido-${safeTitle}-${log.date}.html`);
+    }
 
     const blob = new Blob([html], { type: 'text/html' });
     window.open(URL.createObjectURL(blob), '_blank');
