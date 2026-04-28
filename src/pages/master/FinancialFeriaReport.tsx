@@ -237,6 +237,11 @@ const downloadOrderTotalInvoice = (order: any, email = false) => {
 
 type EditRow = { product: Product; prepared: number; consumed: number };
 
+// Strip a trailing " (Extra N)" suffix so extras get aggregated under
+// their base caseta/order. Module-level to avoid TDZ from earlier
+// useMemo / function bodies referencing it.
+const stripExtraSuffix = (title: string) => title.replace(/\s*\(Extra\s+\d+\)\s*$/i, '');
+
 export const FinancialFeriaReport: React.FC = () => {
     const { historicalLogs, products, categories, editHistoricalLog, editOrderTotal, addProduct } = useAppContext();
     const { addToast } = useToast();
@@ -493,11 +498,6 @@ export const FinancialFeriaReport: React.FC = () => {
             setSendingEmail(null);
         }
     };
-
-    // Strip a trailing " (Extra N)" suffix so extras get aggregated under
-    // their base caseta/order, instead of appearing as separate dropdown
-    // options.
-    const stripExtraSuffix = (title: string) => title.replace(/\s*\(Extra\s+\d+\)\s*$/i, '');
 
     const orderStats = useMemo(() => {
         const stats: Record<string, any> = {};
