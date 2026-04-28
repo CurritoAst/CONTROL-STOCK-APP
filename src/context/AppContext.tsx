@@ -666,6 +666,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (item.prepared < 0 || item.consumed < 0) throw new Error(`"${item.product.name}": valores negativos`);
         }
 
+        // Build a working copy of every log's items so we can spread changes
+        // across multiple days when the user reduces a product below the
+        // capacity of any single day.
+        type WorkingItem = { product: Product; prepared: number; consumed: number };
+        const working: { id: string; date: string; items: Map<string, WorkingItem> }[] = orderLogs.map(log => ({
+            id: log.id,
+            date: log.date,
+            items: new Map(log.items.map(it => [it.product.id, { product: it.product, prepared: it.prepared, consumed: it.consumed }])),
+        }));
+
         const oldTotals: Record<string, { prepared: number; consumed: number }> = {};
         orderLogs.forEach(log => {
             log.items.forEach(it => {
@@ -675,46 +685,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             });
         });
 
-        const newLastItems: Record<string, { product: Product; prepared: number; consumed: number }> = {};
-        lastLog.items.forEach(it => {
-            newLastItems[it.product.id] = { product: it.product, prepared: it.prepared, consumed: it.consumed };
-        });
-
         const stockAdjustments: { productId: string; delta: number; product: Product }[] = [];
 
         for (const ni of newItems) {
             const existedBefore = !!oldTotals[ni.product.id];
             const old = oldTotals[ni.product.id] || { prepared: 0, consumed: 0 };
-            const dPrep = ni.prepared - old.prepared;
-            const dCons = ni.consumed - old.consumed;
+            let dPrep = ni.prepared - old.prepared;
+            let dCons = ni.consumed - old.consumed;
 
-            const curLast = newLastItems[ni.product.id] || { product: ni.product, prepared: 0, consumed: 0 };
-            const nextLastPrep = curLast.prepared + dPrep;
-            const nextLastCons = curLast.consumed + dCons;
+            // Apply additions to the last log; spread reductions backwards
+            // across days from latest to earliest, taking what's available.
+            for (let i = working.length - 1; i >= 0 && (dPrep !== 0 || dCons !== 0); i--) {
+                const log = working[i];
+                const it = log.items.get(ni.product.id) || { product: ni.product, prepared: 0, consumed: 0 };
 
-            if (nextLastPrep < 0 || nextLastCons < 0) {
-                throw new Error(`"${ni.product.name}": la reducción supera lo registrado en el último día (${lastLog.date}). Edita ese día desde la tabla de facturas por día.`);
+                // Prepared: positive deltas only land on the last log; negative
+                // deltas can be absorbed by any log up to its prepared amount.
+                if (dPrep > 0 && i === working.length - 1) {
+                    it.prepared += dPrep;
+                    dPrep = 0;
+                } else if (dPrep < 0) {
+                    const reduce = Math.min(-dPrep, it.prepared);
+                    it.prepared -= reduce;
+                    dPrep += reduce;
+                }
+
+                // Consumed: same rule. After both, ensure consumed <= prepared.
+                if (dCons > 0 && i === working.length - 1) {
+                    it.consumed += dCons;
+                    dCons = 0;
+                } else if (dCons < 0) {
+                    const reduce = Math.min(-dCons, it.consumed);
+                    it.consumed -= reduce;
+                    dCons += reduce;
+                }
+                if (it.consumed > it.prepared) {
+                    const fix = it.consumed - it.prepared;
+                    it.consumed -= fix;
+                    dCons += fix;
+                }
+
+                if (it.prepared === 0 && it.consumed === 0) log.items.delete(ni.product.id);
+                else log.items.set(ni.product.id, it);
             }
-            if (nextLastCons > nextLastPrep) {
-                throw new Error(`"${ni.product.name}": el consumido del último día superaría el preparado. Edita ese día individualmente.`);
+
+            if (dPrep < 0 || dCons < 0) {
+                throw new Error(`"${ni.product.name}": la reducción solicitada supera lo registrado en el evento.`);
+            }
+            if (dPrep > 0 || dCons > 0) {
+                throw new Error(`"${ni.product.name}": no se pudo aplicar el aumento en el último día.`);
             }
 
-            if (nextLastPrep === 0 && nextLastCons === 0) {
-                delete newLastItems[ni.product.id];
-            } else {
-                newLastItems[ni.product.id] = { product: ni.product, prepared: nextLastPrep, consumed: nextLastCons };
-            }
-
-            // Stock: existing products use consumed delta (sobrante already returned);
-            // NEW products added retroactively subtract their full prepared (sobrante
-            // hasn't been returned to warehouse).
             if (existedBefore) {
-                if (dCons !== 0) stockAdjustments.push({ productId: ni.product.id, delta: -dCons, product: ni.product });
+                const finalCons = ni.consumed - old.consumed;
+                if (finalCons !== 0) stockAdjustments.push({ productId: ni.product.id, delta: -finalCons, product: ni.product });
             } else if (ni.prepared > 0) {
                 stockAdjustments.push({ productId: ni.product.id, delta: -ni.prepared, product: ni.product });
             }
         }
 
+        // Removed products: drop them from every log and refund consumed.
         for (const oldId of Object.keys(oldTotals)) {
             const stillExists = newItems.find(ni => ni.product.id === oldId);
             if (!stillExists) {
@@ -723,7 +753,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     const prod = orderLogs.flatMap(l => l.items).find(i => i.product.id === oldId)?.product;
                     if (prod) stockAdjustments.push({ productId: oldId, delta: old.consumed, product: prod });
                 }
-                if (newLastItems[oldId]) delete newLastItems[oldId];
+                for (const log of working) log.items.delete(oldId);
             }
         }
 
@@ -733,21 +763,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             await supabase.from('products').update({ stock: Math.max(0, currentStock + adj.delta) }).eq('id', adj.productId);
         }
 
-        const { error: delErr } = await supabase.from('log_items').delete().eq('daily_log_id', lastLog.id);
-        if (delErr) throw delErr;
+        // Persist every changed log: wipe and re-insert its items.
+        for (const log of working) {
+            const original = orderLogs.find(l => l.id === log.id);
+            const originalItems = new Map(original!.items.map(it => [it.product.id, it]));
+            const changed = log.items.size !== originalItems.size
+                || Array.from(log.items.values()).some(it => {
+                    const o = originalItems.get(it.product.id);
+                    return !o || o.prepared !== it.prepared || o.consumed !== it.consumed;
+                });
+            if (!changed) continue;
 
-        const itemsToInsert = Object.values(newLastItems).map(it => ({
-            daily_log_id: lastLog.id,
-            product_id: it.product.id,
-            prepared: it.prepared,
-            consumed: it.consumed,
-        }));
-        if (itemsToInsert.length > 0) {
-            const { error: insErr } = await supabase.from('log_items').insert(itemsToInsert);
-            if (insErr) throw insErr;
+            const { error: delErr } = await supabase.from('log_items').delete().eq('daily_log_id', log.id);
+            if (delErr) throw delErr;
+
+            const itemsToInsert = Array.from(log.items.values()).map(it => ({
+                daily_log_id: log.id,
+                product_id: it.product.id,
+                prepared: it.prepared,
+                consumed: it.consumed,
+            }));
+            if (itemsToInsert.length > 0) {
+                const { error: insErr } = await supabase.from('log_items').insert(itemsToInsert);
+                if (insErr) throw insErr;
+            }
         }
 
         void normalizedTitle;
+        void lastLog;
         await refreshData();
     };
 
