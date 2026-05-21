@@ -362,8 +362,24 @@ export const EmployeeDashboard: React.FC = () => {
             }
         }
 
+        // Across the whole feria: are there still OPEN logs (i.e. casetas that
+        // haven't done their total close yet)? If so, we must NOT show the
+        // "feria finalizada" screen — the user still needs the cierre buttons.
+        let feriaHasOpenLogs = false;
+        if (isFinalDay) {
+            const feriaDays = new Set(
+                events.filter(e => e.type === 'EVENT' && e.title === feriaNameFinalDay).map(e => e.date)
+            );
+            feriaHasOpenLogs = allLogs.some(l =>
+                feriaDays.has(l.date) &&
+                l.eventTitle &&
+                l.eventTitle.includes(feriaNameFinalDay) &&
+                l.status === 'OPEN'
+            );
+        }
+
         // 1. Completion State: Last Day of Feria Finished
-        if (isFinalDay && isWorkdayFinished) {
+        if (isFinalDay && isWorkdayFinished && !feriaHasOpenLogs) {
             return (
                 <div className="animate-fade-in text-center py-12 px-6">
                     <div className="mb-6">
@@ -425,14 +441,24 @@ export const EmployeeDashboard: React.FC = () => {
 
         // 3. Default Gestionar Panel
 
-        // Find all base casetas active today for the final day feria
+        // Find all base casetas for the feria — gathered across ALL feria days
+        // (not just the final one) plus any programmed casetas, so a caseta
+        // can still be closed even if it has no order on the final day.
         let baseCasetas: string[] = [];
+        const feriaDatesSet = new Set<string>();
         if (isFinalDay) {
-            baseCasetas = Array.from(new Set(
-                logsForDate
-                    .filter(l => l.eventTitle && l.eventTitle.includes(feriaNameFinalDay))
-                    .map(l => l.eventTitle!.replace(/\s*\(Extra \d+\)$/, ''))
-            ));
+            events
+                .filter(e => e.type === 'EVENT' && e.title === feriaNameFinalDay)
+                .forEach(e => feriaDatesSet.add(e.date));
+
+            const fromLogs = allLogs
+                .filter(l => feriaDatesSet.has(l.date) && l.eventTitle && l.eventTitle.includes(feriaNameFinalDay))
+                .map(l => l.eventTitle!.replace(/\s*\(Extra \d+\)$/, ''));
+            const fromProgrammed = events
+                .filter(e => e.type === 'ORDER' && feriaDatesSet.has(e.date) && e.title.includes(feriaNameFinalDay))
+                .map(e => e.title.replace(/\s*\(Extra \d+\)$/, ''));
+
+            baseCasetas = Array.from(new Set([...fromLogs, ...fromProgrammed]));
             // If there are no specific casetas, just use the generic one
             if (baseCasetas.length === 0) {
                 baseCasetas = [`Pedido ${feriaNameFinalDay}`];
@@ -453,18 +479,25 @@ export const EmployeeDashboard: React.FC = () => {
                         </div>
                         <div className="w-full mt-2 flex flex-col gap-2">
                             {baseCasetas.map(casetaBase => {
-                                // Check if this caseta is already closed for today
-                                const casetaLogsToday = logsForDate.filter(l => l.eventTitle && l.eventTitle.replace(/\s*\(Extra \d+\)$/, '') === casetaBase);
-                                const isClosed = casetaLogsToday.length > 0 && casetaLogsToday.every(l => l.status === 'CLOSED' || l.status === 'APPROVED');
-                                
+                                // Look at ALL feria-date logs for this caseta, not just today.
+                                const casetaLogsAll = allLogs.filter(l =>
+                                    feriaDatesSet.has(l.date) &&
+                                    l.eventTitle &&
+                                    l.eventTitle.replace(/\s*\(Extra \d+\)$/, '') === casetaBase
+                                );
+                                const hasAnyLogs = casetaLogsAll.length > 0;
+                                // Fully closed only if there are logs and none are still OPEN.
+                                const isClosed = hasAnyLogs && casetaLogsAll.every(l => l.status === 'CLOSED' || l.status === 'APPROVED');
+
                                 return (
                                     <button
                                         key={casetaBase}
-                                        className={`btn flex items-center justify-between gap-2 shrink-0 w-full p-3 ${isClosed ? 'bg-accent-green/10 border-accent-green/30 text-accent-green opacity-70' : 'btn-primary'}`}
+                                        className={`btn flex items-center justify-between gap-2 shrink-0 w-full p-3 ${isClosed ? 'bg-accent-green/10 border-accent-green/30 text-accent-green opacity-70' : !hasAnyLogs ? 'bg-white/5 border-white/10 text-text-muted opacity-60' : 'btn-primary'}`}
                                         onClick={() => setShowTotalReturn(JSON.stringify({ feriaName: feriaNameFinalDay, casetaBase }))}
-                                        disabled={isClosed}
+                                        disabled={isClosed || !hasAnyLogs}
+                                        title={!hasAnyLogs ? 'Esta caseta no tiene ningún pedido en la feria' : ''}
                                     >
-                                        <span className="font-semibold">{isClosed ? '✅ Cierre Completado' : '🏁 Cierre Total'}</span>
+                                        <span className="font-semibold">{isClosed ? '✅ Cierre Completado' : !hasAnyLogs ? '— Sin pedidos' : '🏁 Cierre Total'}</span>
                                         <span className="text-sm opacity-90 truncate max-w-[60%] text-right">{casetaBase}</span>
                                     </button>
                                 );
