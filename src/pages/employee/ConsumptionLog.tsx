@@ -182,41 +182,48 @@ export const ConsumptionLog: React.FC<{
                 )}
                 {visibleItems.map(item => {
                     const leftover = sobrantes[item.product.id] ?? 0;
+                    const consumed = Math.max(0, item.prepared - leftover);
                     return (
-                        <div key={item.product.id} className="grid grid-cols-12 items-center gap-3 p-4 border border-white/10 rounded-lg bg-bg-primary/50">
+                        <div key={item.product.id} className="grid grid-cols-12 items-center gap-2 p-4 border border-white/10 rounded-lg bg-bg-primary/50">
                             {/* Product name */}
-                            <div className="col-span-12 sm:col-span-5 min-w-0">
+                            <div className="col-span-12 sm:col-span-4 min-w-0">
                                 <div className="font-bold text-lg leading-tight truncate" title={item.product.name}>{item.product.name}</div>
                             </div>
 
-                            {/* Total enviado — big number on its own column */}
-                            <div className="col-span-5 sm:col-span-3 text-center">
-                                <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Enviado</div>
+                            {/* Enviado — big number */}
+                            <div className="col-span-3 sm:col-span-2 text-center">
+                                <div className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-1">Enviado</div>
                                 <div className="text-2xl font-black text-accent-blue leading-none">{item.prepared}</div>
                             </div>
 
-                            {/* Sobrante — input + stepper on its own column */}
-                            <div className="col-span-7 sm:col-span-4">
-                                <div className="text-[10px] font-bold uppercase tracking-wider text-accent-red mb-1 text-center">Sobrante</div>
-                                <div className="flex items-center justify-center gap-1.5">
+                            {/* Sobrante — input + stepper */}
+                            <div className="col-span-6 sm:col-span-4">
+                                <div className="text-[9px] font-bold uppercase tracking-wider text-accent-red mb-1 text-center">− Sobrante</div>
+                                <div className="flex items-center justify-center gap-1">
                                     <button
-                                        className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-lg flex items-center justify-center transition-colors shrink-0"
                                         onClick={() => setSobrantes(prev => ({ ...prev, [item.product.id]: Math.max(0, (prev[item.product.id] ?? 0) - 1) }))}
                                     >−</button>
                                     <input
                                         type="number"
                                         min="0"
                                         max={item.prepared}
-                                        className={`w-16 text-center text-xl font-bold py-1.5 rounded border bg-bg-elevated/30 outline-none focus:border-accent-blue transition-colors ${leftover > 0 ? 'border-accent-blue text-accent-blue' : 'border-white/10 text-text-muted'}`}
+                                        className={`w-14 text-center text-lg font-bold py-1 rounded border bg-bg-elevated/30 outline-none focus:border-accent-blue transition-colors ${leftover > 0 ? 'border-accent-blue text-accent-blue' : 'border-white/10 text-text-muted'}`}
                                         value={sobrantes[item.product.id] === undefined ? '' : leftover}
                                         placeholder="0"
                                         onChange={e => handleChange(item.product.id, e.target.value, item.prepared)}
                                     />
                                     <button
-                                        className="w-9 h-9 rounded-full bg-white/10 hover:bg-accent-blue/40 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-accent-blue/40 text-white font-bold text-lg flex items-center justify-center transition-colors shrink-0"
                                         onClick={() => setSobrantes(prev => ({ ...prev, [item.product.id]: Math.min(item.prepared, (prev[item.product.id] ?? 0) + 1) }))}
                                     >+</button>
                                 </div>
+                            </div>
+
+                            {/* = Consumido (resultado) */}
+                            <div className="col-span-3 sm:col-span-2 text-center">
+                                <div className="text-[9px] font-bold uppercase tracking-wider text-accent-green mb-1">= Consumido</div>
+                                <div className="text-2xl font-black text-accent-green leading-none">{consumed}</div>
                             </div>
                         </div>
                     );
