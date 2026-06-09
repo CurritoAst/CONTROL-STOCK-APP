@@ -21,7 +21,7 @@ export const ConsumptionLog: React.FC<{
     // Aggregate items if multiple logs are provided
     const items = React.useMemo(() => {
         if (currentLog) return currentLog.items;
-        
+
         const aggregated: Record<string, InventoryItem> = {};
         aggregatedLogs?.forEach(log => {
             log.items.forEach(item => {
@@ -29,11 +29,27 @@ export const ConsumptionLog: React.FC<{
                     aggregated[item.product.id] = { ...item };
                 } else {
                     aggregated[item.product.id].prepared += item.prepared;
+                    aggregated[item.product.id].consumed += item.consumed;
                 }
             });
         });
         return Object.values(aggregated);
     }, [currentLog, aggregatedLogs]);
+
+    // Pre-populate inputs with existing sobrantes so re-opening Sobrantes on a
+    // CLOSED/APPROVED log shows what was recorded last time instead of
+    // silently wiping it on save.
+    const sobrantesInitialised = React.useRef(false);
+    React.useEffect(() => {
+        if (sobrantesInitialised.current || items.length === 0) return;
+        const initial: Record<string, number> = {};
+        items.forEach(it => {
+            const left = Math.max(0, it.prepared - it.consumed);
+            if (left > 0) initial[it.product.id] = left;
+        });
+        if (Object.keys(initial).length > 0) setSobrantes(initial);
+        sobrantesInitialised.current = true;
+    }, [items]);
 
     const displayDate = currentLog?.date || (aggregatedLogs && aggregatedLogs.length > 0 ? aggregatedLogs[0].date : '');
     const displayTitle = currentLog?.eventTitle || (aggregatedLogs && aggregatedLogs.length > 0 ? aggregatedLogs[0].eventTitle : '');

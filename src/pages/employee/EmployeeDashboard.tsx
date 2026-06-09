@@ -293,8 +293,14 @@ export const EmployeeDashboard: React.FC = () => {
                                                         setIsEditingOrder(true);
                                                     }}>✏️ Editar</button>
                                                 )}
-                                                {log.status === 'OPEN' && (
-                                                    <button className="btn btn-outline text-sm" onClick={() => setSelectedLogForSobrantes(log.id)}>📦 Sobrantes</button>
+                                                {(log.status === 'OPEN' || log.status === 'CLOSED' || log.status === 'APPROVED') && (
+                                                    <button
+                                                        className={`btn btn-outline text-sm ${log.status === 'APPROVED' ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
+                                                        onClick={() => setSelectedLogForSobrantes(log.id)}
+                                                        title={log.status === 'APPROVED' ? 'Ajustar sobrantes en un pedido ya aprobado' : 'Registrar sobrantes'}
+                                                    >
+                                                        📦 {log.status === 'APPROVED' ? 'Ajustar Sobrantes' : 'Sobrantes'}
+                                                    </button>
                                                 )}
                                                 {log.status === 'REJECTED' && (
                                                     <button className="btn btn-outline border-accent-red text-accent-red text-sm" onClick={() => deleteDailyLog(log.id)}>🗑 Descartar</button>
@@ -545,9 +551,13 @@ export const EmployeeDashboard: React.FC = () => {
                                                     ✏️ Editar
                                                 </button>
                                             )}
-                                            {log.status === 'OPEN' && (
-                                                <button className="btn btn-outline text-sm" onClick={() => setSelectedLogForSobrantes(log.id)}>
-                                                    📦 Sobrantes
+                                            {(log.status === 'OPEN' || log.status === 'CLOSED' || log.status === 'APPROVED') && (
+                                                <button
+                                                    className={`btn btn-outline text-sm ${log.status === 'APPROVED' ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
+                                                    onClick={() => setSelectedLogForSobrantes(log.id)}
+                                                    title={log.status === 'APPROVED' ? 'Ajustar sobrantes en un pedido ya aprobado' : 'Registrar sobrantes'}
+                                                >
+                                                    📦 {log.status === 'APPROVED' ? 'Ajustar Sobrantes' : 'Sobrantes'}
                                                 </button>
                                             )}
                                             {log.status === 'REJECTED' && (
