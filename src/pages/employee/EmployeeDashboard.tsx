@@ -492,18 +492,20 @@ export const EmployeeDashboard: React.FC = () => {
                                     l.eventTitle.replace(/\s*\(Extra \d+\)$/, '') === casetaBase
                                 );
                                 const hasAnyLogs = casetaLogsAll.length > 0;
-                                // Fully closed only if there are logs and none are still OPEN.
-                                const isClosed = hasAnyLogs && casetaLogsAll.every(l => l.status === 'CLOSED' || l.status === 'APPROVED');
+                                // "Closed" = no log still in OPEN status. APPROVED is still a
+                                // valid target for retroactive sobrante adjustment, so we keep
+                                // the button enabled and just change the label.
+                                const allDone = hasAnyLogs && casetaLogsAll.every(l => l.status === 'CLOSED' || l.status === 'APPROVED');
 
                                 return (
                                     <button
                                         key={casetaBase}
-                                        className={`btn flex items-center justify-between gap-2 shrink-0 w-full p-3 ${isClosed ? 'bg-accent-green/10 border-accent-green/30 text-accent-green opacity-70' : !hasAnyLogs ? 'bg-white/5 border-white/10 text-text-muted opacity-60' : 'btn-primary'}`}
+                                        className={`btn flex items-center justify-between gap-2 shrink-0 w-full p-3 ${!hasAnyLogs ? 'bg-white/5 border-white/10 text-text-muted opacity-60' : allDone ? 'bg-accent-green/10 border-accent-green/30 text-accent-green hover:bg-accent-green/20' : 'btn-primary'}`}
                                         onClick={() => setShowTotalReturn(JSON.stringify({ feriaName: feriaNameFinalDay, casetaBase }))}
-                                        disabled={isClosed || !hasAnyLogs}
-                                        title={!hasAnyLogs ? 'Esta caseta no tiene ningún pedido en la feria' : ''}
+                                        disabled={!hasAnyLogs}
+                                        title={!hasAnyLogs ? 'Esta caseta no tiene ningún pedido en la feria' : allDone ? 'Ya cerrada — pulsa para ajustar sobrantes' : ''}
                                     >
-                                        <span className="font-semibold">{isClosed ? '✅ Cierre Completado' : !hasAnyLogs ? '— Sin pedidos' : '🏁 Cierre Total'}</span>
+                                        <span className="font-semibold">{!hasAnyLogs ? '— Sin pedidos' : allDone ? '🔁 Ajustar Cierre' : '🏁 Cierre Total'}</span>
                                         <span className="text-sm opacity-90 truncate max-w-[60%] text-right">{casetaBase}</span>
                                     </button>
                                 );
