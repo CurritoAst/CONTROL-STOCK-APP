@@ -54,7 +54,7 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
                 addToast("Hubo un error enviando la factura por email.", "error");
             }
 
-            addToast(`Pedido para ${selectedDate} enviado a cocina e impresoras notificadas`, 'success');
+            addToast(`✅ Pedido del ${selectedDate} guardado e impreso. Lo encontrarás en "Pedidos Diarios" (badge rojo en la barra lateral).`, 'success');
             if (onLogCreated) onLogCreated();
         } catch (error) {
             console.error("Error creating log:", error);

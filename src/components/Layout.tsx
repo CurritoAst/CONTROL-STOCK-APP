@@ -17,7 +17,13 @@ type SectionDef = {
 export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; onTabChange?: (tab: any) => void }> = ({ children, activeTab, onTabChange }) => {
     const { role, setRole, activeLogs } = useAppContext();
 
-    const pendingAudits = activeLogs.filter(log => log.status === 'CLOSED' || log.status === 'PENDING_PEDIDO').length;
+    // Any active log that's not yet APPROVED needs the master's attention at
+    // some point: PENDING_PEDIDO needs an initial OK, OPEN needs sobrantes,
+    // CLOSED needs the final approval. Counting all of them makes sure newly
+    // created pedidos always raise the sidebar badge.
+    const pendingAudits = activeLogs.filter(log =>
+        log.status === 'PENDING_PEDIDO' || log.status === 'OPEN' || log.status === 'CLOSED'
+    ).length;
 
     const [showLogoutModal, setShowLogoutModal] = React.useState(false);
 

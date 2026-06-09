@@ -63,6 +63,9 @@ export const MasterDashboard: React.FC<{
     }, 0);
 
     const pendingAudits = activeLogs.filter(log => log.status === 'CLOSED' || log.status === 'PENDING_PEDIDO').length;
+    const openCount = activeLogs.filter(log => log.status === 'OPEN').length;
+    const closedCount = activeLogs.filter(log => log.status === 'CLOSED').length;
+    const pendingPedidoCount = activeLogs.filter(log => log.status === 'PENDING_PEDIDO').length;
 
     return (
         <div className="animate-fade-in w-full">
@@ -147,6 +150,47 @@ export const MasterDashboard: React.FC<{
                             )}
                         </div>
                     </div>
+
+                    {(openCount > 0 || closedCount > 0 || pendingPedidoCount > 0) && (
+                        <div className="bg-gradient-to-r from-accent-red/15 to-accent-blue/10 border-2 border-accent-red/40 rounded-2xl p-5 mb-6 shadow-lg shadow-accent-red/10">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="text-3xl">🚨</div>
+                                    <div>
+                                        <h4 className="font-black uppercase tracking-wider text-accent-red text-sm mb-1.5">
+                                            Pedidos esperando tu acción
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {pendingPedidoCount > 0 && (
+                                                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-accent-blue/20 text-accent-blue border border-accent-blue/30">
+                                                    📨 {pendingPedidoCount} sin aprobar
+                                                </span>
+                                            )}
+                                            {openCount > 0 && (
+                                                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-accent-purple/20 text-purple-400 border border-purple-400/30">
+                                                    📋 {openCount} en curso (faltan sobrantes)
+                                                </span>
+                                            )}
+                                            {closedCount > 0 && (
+                                                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-accent-green/20 text-accent-green border border-accent-green/30">
+                                                    ✅ {closedCount} listos para aprobar
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[10px] text-text-muted mt-2 leading-relaxed">
+                                            Estos pedidos NO aparecen en el análisis histórico hasta que se aprueban. Pulsa abajo para gestionarlos.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => onTabChange('AUDIT')}
+                                    className="btn btn-primary whitespace-nowrap shrink-0"
+                                >
+                                    📋 Ver Pedidos Diarios →
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {!isPushEnabled && (
                         <div className="bg-accent-blue/10 border border-accent-blue/20 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
