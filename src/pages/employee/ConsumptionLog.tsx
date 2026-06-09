@@ -224,7 +224,7 @@ export const ConsumptionLog: React.FC<{
                                         type="number"
                                         min="0"
                                         max={item.prepared}
-                                        className={`w-14 text-center font-mono tabular-nums text-lg py-1 rounded-md border bg-bg-elevated/40 outline-none focus:border-accent-blue transition-colors ${isActive ? 'border-accent-blue text-accent-blue' : 'border-white/10 text-text-muted'}`}
+                                        className={`w-14 px-0 text-center font-mono tabular-nums text-lg py-1 rounded-md border bg-bg-elevated/40 outline-none focus:border-accent-blue transition-colors ${isActive ? 'border-accent-blue text-accent-blue' : 'border-white/10 text-text-muted'}`}
                                         value={sobrantes[item.product.id] === undefined ? '' : leftover}
                                         placeholder="0"
                                         onChange={e => handleChange(item.product.id, e.target.value, item.prepared)}

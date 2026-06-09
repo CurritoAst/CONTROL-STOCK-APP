@@ -58,6 +58,18 @@
     @apply outline-none border-accent-blue/50 ring-4 ring-accent-blue/10 bg-bg-primary/80;
   }
 
+  /* Strip the native spinner arrows from number inputs — they steal
+     horizontal room and clip centred values in narrow fields. */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   label {
     @apply text-sm font-semibold text-text-muted mb-2 block ml-1;
   }
