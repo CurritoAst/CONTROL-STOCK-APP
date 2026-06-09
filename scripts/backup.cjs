@@ -16,7 +16,8 @@ const SUPABASE_KEY = 'sb_publishable_vAsF5VdMJ5xFYQ-CdetqIw_fldKtmxs';
 const BACKUP_DIR   = 'C:\\Users\\curri\\OneDrive\\Desktop\\Copias Maca';
 // ──────────────────────────────────────────────────────────────────────────────
 
-function fetchTable(table) {
+// Single page fetch with optional Range header to defeat the 1000-row default.
+function fetchPage(table, from, to) {
     return new Promise((resolve, reject) => {
         const url = new URL(`/rest/v1/${table}?select=*`, SUPABASE_URL);
         const options = {
@@ -26,7 +27,9 @@ function fetchTable(table) {
             headers: {
                 'apikey': SUPABASE_KEY,
                 'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Range': `${from}-${to}`,
+                'Range-Unit': 'items',
             }
         };
 
@@ -45,6 +48,21 @@ function fetchTable(table) {
         req.on('error', reject);
         req.end();
     });
+}
+
+// Walks a table in 1000-row chunks until exhausted. Supabase REST silently
+// caps each response at 1000 rows; without pagination the newest items get
+// lost the moment any table grows past that line.
+async function fetchTable(table) {
+    const PAGE = 1000;
+    const all = [];
+    for (let from = 0; ; from += PAGE) {
+        const page = await fetchPage(table, from, from + PAGE - 1);
+        if (!Array.isArray(page) || page.length === 0) break;
+        all.push(...page);
+        if (page.length < PAGE) break;
+    }
+    return all;
 }
 
 async function runBackup() {

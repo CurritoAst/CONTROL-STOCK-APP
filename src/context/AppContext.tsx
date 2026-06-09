@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppState, Role, Product, DailyLog, InventoryItem, EventType, BackupSnapshot, BackupTrigger } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, fetchAll } from '../lib/supabaseClient';
 import { createClient } from '@supabase/supabase-js';
 import { useToast } from './ToastContext';
 
@@ -122,38 +122,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const refreshProducts = async () => {
-        const { data, error } = await supabase.from('products').select('*');
-        if (error) { console.error("Error fetching products:", error); return; }
-        setState(s => ({ ...s, products: data as Product[] }));
-        return data as Product[];
-    };
-
-    // Supabase REST defaults to a 1000-row limit. When log_items grows past
-    // that we silently lose the newest items unless we paginate. Loop in
-    // 1000-row chunks until we exhaust the table.
-    const fetchAllPaginated = async <T,>(table: string, selectCols: string = '*', orderCol?: string): Promise<T[]> => {
-        const PAGE = 1000;
-        const all: T[] = [];
-        for (let from = 0; ; from += PAGE) {
-            let q = supabase.from(table).select(selectCols).range(from, from + PAGE - 1);
-            if (orderCol) q = q.order(orderCol, { ascending: false });
-            const { data, error } = await q;
-            if (error) throw error;
-            if (!data || data.length === 0) break;
-            all.push(...(data as unknown as T[]));
-            if (data.length < PAGE) break;
+        try {
+            const data = await fetchAll<Product>('products');
+            setState(s => ({ ...s, products: data }));
+            return data;
+        } catch (error) {
+            console.error("Error fetching products:", error);
+            return;
         }
-        return all;
     };
 
     const refreshLogs = async (currentProducts: Product[]) => {
         let logsData: any[] = [];
         let itemsData: any[] = [];
         try {
-            logsData = await fetchAllPaginated<any>('daily_logs', '*', 'date');
+            logsData = await fetchAll<any>('daily_logs', { orderBy: { column: 'date', ascending: false } });
         } catch (e) { console.error('Error fetching logs:', e); return; }
         try {
-            itemsData = await fetchAllPaginated<any>('log_items', '*');
+            itemsData = await fetchAll<any>('log_items');
         } catch (e) { console.error('Error fetching log items:', e); return; }
 
         const parsedLogs: DailyLog[] = logsData.map(log => {
@@ -201,11 +187,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (prods) await refreshLogs(prods);
 
         // Refresh Events
-        const { data: eventsData, error: eventsError } = await supabase.from('events').select('*');
-        if (eventsError) {
+        try {
+            const eventsData = await fetchAll<EventType>('events');
+            setState(s => ({ ...s, events: eventsData }));
+        } catch (eventsError) {
             console.error("Error fetching events:", eventsError);
-        } else {
-            setState(s => ({ ...s, events: eventsData as EventType[] }));
         }
     };
 
@@ -879,23 +865,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description?: string
     ): Promise<BackupSnapshot | null> => {
         try {
-            const [
-                { data: products },
-                { data: events },
-                { data: daily_logs },
-                { data: log_items }
-            ] = await Promise.all([
-                supabase.from('products').select('*'),
-                supabase.from('events').select('*'),
-                supabase.from('daily_logs').select('*'),
-                supabase.from('log_items').select('*')
+            const [products, events, daily_logs, log_items] = await Promise.all([
+                fetchAll('products'),
+                fetchAll('events'),
+                fetchAll('daily_logs'),
+                fetchAll('log_items'),
             ]);
             const payload = {
                 fecha: new Date().toISOString(),
-                products: products || [],
-                events: events || [],
-                daily_logs: daily_logs || [],
-                log_items: log_items || []
+                products,
+                events,
+                daily_logs,
+                log_items,
             };
             const serialized = JSON.stringify(payload);
             const sizeBytes = serialized.length;

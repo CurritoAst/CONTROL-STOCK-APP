@@ -8,7 +8,7 @@ import { FinancialFeriaReport } from './FinancialFeriaReport';
 import { EmployeeDashboard } from '../employee/EmployeeDashboard';
 import { BackupsPanel } from './BackupsPanel';
 import { useAppContext } from '../../context/AppContext';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, fetchAll } from '../../lib/supabaseClient';
 
 export const MasterDashboard: React.FC<{
     activeTab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE' | 'BACKUPS';
@@ -20,24 +20,19 @@ export const MasterDashboard: React.FC<{
     const downloadBackup = async () => {
         setIsBackingUp(true);
         try {
-            const [
-                { data: products },
-                { data: events },
-                { data: logs },
-                { data: items }
-            ] = await Promise.all([
-                supabase.from('products').select('*'),
-                supabase.from('events').select('*'),
-                supabase.from('daily_logs').select('*'),
-                supabase.from('log_items').select('*')
+            const [products, events, daily_logs, log_items] = await Promise.all([
+                fetchAll('products'),
+                fetchAll('events'),
+                fetchAll('daily_logs'),
+                fetchAll('log_items'),
             ]);
 
             const backup = {
                 fecha: new Date().toISOString(),
-                products: products || [],
-                events: events || [],
-                daily_logs: logs || [],
-                log_items: items || []
+                products,
+                events,
+                daily_logs,
+                log_items,
             };
 
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });

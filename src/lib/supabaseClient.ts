@@ -40,3 +40,37 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         fetch: secureFetch
     }
 });
+
+/**
+ * Walks a table in 1000-row pages until exhausted.
+ *
+ * Supabase REST silently caps responses at 1000 rows by default. Any code path
+ * that does `supabase.from(table).select('*')` and then assumes it has every
+ * row is a latent data-truncation bug. Use this helper instead.
+ *
+ * Optional filters can be applied via the `customise` callback.
+ */
+export async function fetchAll<T = any>(
+    table: string,
+    options: {
+        select?: string;
+        orderBy?: { column: string; ascending?: boolean };
+        customise?: (q: any) => any; // allow .eq(...).in(...) etc
+    } = {}
+): Promise<T[]> {
+    const PAGE = 1000;
+    const all: T[] = [];
+    for (let from = 0; ; from += PAGE) {
+        let q = supabase.from(table).select(options.select || '*');
+        if (options.orderBy) q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? false });
+        if (options.customise) q = options.customise(q);
+        q = q.range(from, from + PAGE - 1);
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...(data as unknown as T[]));
+        if (data.length < PAGE) break;
+    }
+    return all;
+}
+

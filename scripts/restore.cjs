@@ -50,10 +50,22 @@ const baseHeaders = {
     'Content-Type': 'application/json',
 };
 
+// Paginates in 1000-row chunks so we never silently lose rows past the
+// Supabase REST default cap.
 async function fetchAll(table) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*`, { headers: baseHeaders });
-    if (!res.ok) throw new Error(`GET ${table} (${res.status}): ${await res.text()}`);
-    return await res.json();
+    const PAGE = 1000;
+    const all = [];
+    for (let from = 0; ; from += PAGE) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*`, {
+            headers: { ...baseHeaders, Range: `${from}-${from + PAGE - 1}`, 'Range-Unit': 'items' },
+        });
+        if (!res.ok) throw new Error(`GET ${table} (${res.status}): ${await res.text()}`);
+        const page = await res.json();
+        if (!Array.isArray(page) || page.length === 0) break;
+        all.push(...page);
+        if (page.length < PAGE) break;
+    }
+    return all;
 }
 
 async function deleteByIds(table, ids, idColumn = 'id') {
