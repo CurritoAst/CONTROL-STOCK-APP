@@ -128,12 +128,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return data as Product[];
     };
 
-    const refreshLogs = async (currentProducts: Product[]) => {
-        const { data: logsData, error: logsError } = await supabase.from('daily_logs').select('*').order('date', { ascending: false });
-        if (logsError) { console.error("Error fetching logs:", logsError); return; }
+    // Supabase REST defaults to a 1000-row limit. When log_items grows past
+    // that we silently lose the newest items unless we paginate. Loop in
+    // 1000-row chunks until we exhaust the table.
+    const fetchAllPaginated = async <T,>(table: string, selectCols: string = '*', orderCol?: string): Promise<T[]> => {
+        const PAGE = 1000;
+        const all: T[] = [];
+        for (let from = 0; ; from += PAGE) {
+            let q = supabase.from(table).select(selectCols).range(from, from + PAGE - 1);
+            if (orderCol) q = q.order(orderCol, { ascending: false });
+            const { data, error } = await q;
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            all.push(...(data as unknown as T[]));
+            if (data.length < PAGE) break;
+        }
+        return all;
+    };
 
-        const { data: itemsData, error: itemsError } = await supabase.from('log_items').select('*');
-        if (itemsError) { console.error("Error fetching log items:", itemsError); return; }
+    const refreshLogs = async (currentProducts: Product[]) => {
+        let logsData: any[] = [];
+        let itemsData: any[] = [];
+        try {
+            logsData = await fetchAllPaginated<any>('daily_logs', '*', 'date');
+        } catch (e) { console.error('Error fetching logs:', e); return; }
+        try {
+            itemsData = await fetchAllPaginated<any>('log_items', '*');
+        } catch (e) { console.error('Error fetching log items:', e); return; }
 
         const parsedLogs: DailyLog[] = logsData.map(log => {
             const items = itemsData
