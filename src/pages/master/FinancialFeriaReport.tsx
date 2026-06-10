@@ -247,6 +247,7 @@ export const FinancialFeriaReport: React.FC = () => {
     const { addToast } = useToast();
     const [selectedOrderId, setSelectedOrderId] = useState<string>('');
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
+    const [productBreakdownOpen, setProductBreakdownOpen] = useState(false);
     const [sendingEmail, setSendingEmail] = useState<string | null>(null);
     const [editing, setEditing] = useState<{ logId: string; date: string; title: string } | null>(null);
     const [editRows, setEditRows] = useState<EditRow[]>([]);
@@ -640,29 +641,42 @@ export const FinancialFeriaReport: React.FC = () => {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div>
-                            <h4 className="text-sm font-bold uppercase text-text-muted mb-4 border-l-2 border-accent-blue pl-3">Desglose por Producto</h4>
-                            <div className="bg-bg-elevated/20 border border-white/5 rounded-lg overflow-hidden">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-white/5 text-text-muted uppercase">
-                                        <tr>
-                                            <th className="p-3">Producto</th>
-                                            <th className="p-3 text-center">Consumo</th>
-                                            <th className="p-3 text-center">Merma</th>
-                                            <th className="p-3 text-right">Coste (€)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5">
-                                        {selectedOrder.productTotals.map((prod: any) => (
-                                            <tr key={prod.name} className="hover:bg-white/5">
-                                                <td className="p-3 font-bold">{prod.name}</td>
-                                                <td className="p-3 text-center">{prod.consumed}</td>
-                                                <td className="p-3 text-center text-accent-red">{prod.loss}</td>
-                                                <td className="p-3 text-right font-bold">{prod.cost.toLocaleString('es-ES')} €</td>
+                            <button
+                                type="button"
+                                onClick={() => setProductBreakdownOpen(o => !o)}
+                                aria-expanded={productBreakdownOpen}
+                                className="w-full flex items-center justify-between gap-2 mb-4 border-l-2 border-accent-blue pl-3 group select-none"
+                            >
+                                <h4 className="text-sm font-bold uppercase text-text-muted group-hover:text-white transition-colors flex items-center gap-2">
+                                    <span className="text-text-muted">{productBreakdownOpen ? '▾' : '▸'}</span>
+                                    Desglose por Producto
+                                    <span className="text-text-muted/60 normal-case font-normal">({selectedOrder.productTotals.length})</span>
+                                </h4>
+                            </button>
+                            {productBreakdownOpen && (
+                                <div className="bg-bg-elevated/20 border border-white/5 rounded-lg overflow-hidden animate-fade-in">
+                                    <table className="w-full text-left text-xs">
+                                        <thead className="bg-white/5 text-text-muted uppercase">
+                                            <tr>
+                                                <th className="p-3">Producto</th>
+                                                <th className="p-3 text-center">Consumo</th>
+                                                <th className="p-3 text-center">Merma</th>
+                                                <th className="p-3 text-right">Coste (€)</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {selectedOrder.productTotals.map((prod: any) => (
+                                                <tr key={prod.name} className="hover:bg-white/5">
+                                                    <td className="p-3 font-bold">{prod.name}</td>
+                                                    <td className="p-3 text-center">{prod.consumed}</td>
+                                                    <td className="p-3 text-center text-accent-red">{prod.loss}</td>
+                                                    <td className="p-3 text-right font-bold">{prod.cost.toLocaleString('es-ES')} €</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
                         <div>
