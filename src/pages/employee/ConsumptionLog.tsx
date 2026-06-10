@@ -39,17 +39,32 @@ export const ConsumptionLog: React.FC<{
     // Pre-populate inputs with existing sobrantes so re-opening Sobrantes on a
     // CLOSED/APPROVED log shows what was recorded last time instead of
     // silently wiping it on save.
+    //
+    // IMPORTANT: only pre-fill from logs that have ALREADY been closed/approved,
+    // where `consumed` is a real recorded value (leftover = prepared - consumed).
+    // For an OPEN log `consumed` is still 0, so prepared - consumed = prepared,
+    // which would wrongly default every untouched item to "everything left over"
+    // and refund its full sent quantity back to stock on save. OPEN logs must
+    // start empty (0 leftover = everything consumed).
     const sobrantesInitialised = React.useRef(false);
     React.useEffect(() => {
         if (sobrantesInitialised.current || items.length === 0) return;
+
+        const isRecorded = (s: DailyLog['status']) => s === 'CLOSED' || s === 'APPROVED';
+        const sourceLogs = currentLog ? [currentLog] : (aggregatedLogs ?? []);
+
         const initial: Record<string, number> = {};
-        items.forEach(it => {
-            const left = Math.max(0, it.prepared - it.consumed);
-            if (left > 0) initial[it.product.id] = left;
+        sourceLogs.forEach(log => {
+            if (!isRecorded(log.status)) return;
+            log.items.forEach(it => {
+                const left = Math.max(0, it.prepared - it.consumed);
+                if (left > 0) initial[it.product.id] = (initial[it.product.id] ?? 0) + left;
+            });
         });
+
         if (Object.keys(initial).length > 0) setSobrantes(initial);
         sobrantesInitialised.current = true;
-    }, [items]);
+    }, [items, currentLog, aggregatedLogs]);
 
     const displayDate = currentLog?.date || (aggregatedLogs && aggregatedLogs.length > 0 ? aggregatedLogs[0].date : '');
     const displayTitle = currentLog?.eventTitle || (aggregatedLogs && aggregatedLogs.length > 0 ? aggregatedLogs[0].eventTitle : '');
