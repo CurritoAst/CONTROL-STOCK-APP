@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { BarChart3, Tag, X } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 
 export const ProductAnalytics: React.FC = () => {
@@ -66,15 +67,20 @@ export const ProductAnalytics: React.FC = () => {
         <div className="animate-fade-in content-auto-height">
             <div className="card mb-8">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h2 className="text-2xl mb-2">📈 Análisis de Trazabilidad por Producto</h2>
-                        <p className="text-text-secondary">Consulta el histórico acumulado de preparación, desgaste y pérdidas físicas por sección.</p>
+                    <div className="flex items-start gap-3">
+                        <span className="icon-chip icon-chip-blue mt-0.5">
+                            <BarChart3 size={18} strokeWidth={2.2} />
+                        </span>
+                        <div>
+                            <h2 className="text-2xl mb-2">Análisis de Trazabilidad por Producto</h2>
+                            <p className="text-text-muted text-sm mb-0">Consulta el histórico acumulado de preparación, desgaste y pérdidas físicas por sección.</p>
+                        </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                         <select
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-48"
+                            className="py-2 px-3 text-sm rounded-lg w-full sm:w-48"
                         >
                             <option value="Todas">Todas las secciones</option>
                             {categories.map(cat => (
@@ -86,7 +92,7 @@ export const ProductAnalytics: React.FC = () => {
                                 type="date"
                                 value={dateFrom}
                                 onChange={e => setDateFrom(e.target.value)}
-                                className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue text-sm w-full sm:w-auto"
+                                className="py-2 px-3 text-sm rounded-lg w-full sm:w-auto"
                                 title="Desde"
                             />
                             <span className="text-text-muted shrink-0">—</span>
@@ -94,15 +100,16 @@ export const ProductAnalytics: React.FC = () => {
                                 type="date"
                                 value={dateTo}
                                 onChange={e => setDateTo(e.target.value)}
-                                className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue text-sm w-full sm:w-auto"
+                                className="py-2 px-3 text-sm rounded-lg w-full sm:w-auto"
                                 title="Hasta"
                             />
                             {(dateFrom || dateTo) && (
                                 <button
-                                    className="text-text-muted hover:text-white text-sm shrink-0 transition-colors"
+                                    className="text-text-muted hover:text-white shrink-0 transition-colors p-1"
                                     onClick={() => { setDateFrom(''); setDateTo(''); }}
                                     title="Limpiar fechas"
-                                >✕</button>
+                                    aria-label="Limpiar fechas"
+                                ><X size={16} strokeWidth={2.2} /></button>
                             )}
                         </div>
                     </div>
@@ -112,12 +119,15 @@ export const ProductAnalytics: React.FC = () => {
             <div className="space-y-10">
                 {filteredCategories.map(category => (
                     <div key={category} className="animate-fade-in">
-                        <div className="flex items-center gap-4 mb-6">
-                            <h3 className="text-xl font-bold text-accent-blue whitespace-nowrap">{category}</h3>
-                            <div className="h-[1px] w-full bg-white/10" />
+                        <div className="flex items-center gap-3 mb-6">
+                            <span className="icon-chip icon-chip-blue">
+                                <Tag size={16} strokeWidth={2.2} />
+                            </span>
+                            <h3 className="text-lg font-bold whitespace-nowrap mb-0">{category}</h3>
+                            <div className="divider-gradient flex-1" />
                         </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {groupedAnalytics[category].sort((a, b) => b.costGenerated - a.costGenerated).map(stat => (
                                 <div key={stat.id} className="card relative overflow-hidden group hover:border-accent-blue/50 transition-colors bg-bg-elevated/30">
                                     <div className="flex justify-between items-start mb-4 relative z-10">
@@ -127,22 +137,22 @@ export const ProductAnalytics: React.FC = () => {
                                         </div>
                                         <div className="text-right shrink-0">
                                             <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Costo Total</div>
-                                            <div className="text-xl font-bold text-accent-red">{stat.costGenerated.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <div className="text-xl font-bold text-accent-red num">{stat.costGenerated.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-3 gap-2 text-center border-t border-white/5 pt-4 relative z-10">
                                         <div>
                                             <div className="text-[10px] text-text-muted uppercase mb-1">Preparado</div>
-                                            <div className="text-base font-bold">{stat.totalPrepared}</div>
+                                            <div className="text-base font-bold num">{stat.totalPrepared}</div>
                                         </div>
                                         <div>
                                             <div className="text-[10px] text-text-muted uppercase mb-1">Consumido</div>
-                                            <div className="text-base font-bold text-accent-blue">{stat.totalConsumed}</div>
+                                            <div className="text-base font-bold text-accent-blue num">{stat.totalConsumed}</div>
                                         </div>
                                         <div>
                                             <div className="text-[10px] text-text-muted uppercase mb-1">Sobrantes</div>
-                                            <div className={`text-base font-bold ${Number(stat.wastagePercent) > 30 ? 'text-accent-red' : 'text-accent-green'}`}>
+                                            <div className={`text-base font-bold num ${Number(stat.wastagePercent) > 30 ? 'text-accent-red' : 'text-accent-green'}`}>
                                                 {stat.totalLeftover} <span className="text-[10px] font-normal">({stat.wastagePercent}%)</span>
                                             </div>
                                         </div>
@@ -159,8 +169,13 @@ export const ProductAnalytics: React.FC = () => {
                 ))}
 
                 {categories.length === 0 && (
-                    <div className="card text-center py-10">
-                        <p className="text-text-muted">No hay productos en el catálogo para registrar analíticas.</p>
+                    <div className="card">
+                        <div className="empty-state">
+                            <div className="empty-state-icon">
+                                <BarChart3 size={20} strokeWidth={2} />
+                            </div>
+                            <p className="text-text-muted mb-0">No hay productos en el catálogo para registrar analíticas.</p>
+                        </div>
                     </div>
                 )}
             </div>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Bell, BellRing, ChevronDown, ChevronUp, Loader2, LogOut, Mail, Printer, ReceiptText, Send } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { sendViaGmail } from '../../lib/gmailSend';
@@ -275,21 +276,24 @@ export const SaulDashboard: React.FC = () => {
     }, [historicalLogs]);
 
     return (
-        <div className="p-4 max-w-3xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
+        <div className="p-4 md:p-6 max-w-3xl mx-auto animate-fade-in">
+            <div className="page-header">
                 <div>
-                    <h1 className="text-2xl font-bold">Pedidos y Ferias</h1>
-                    <p className="text-text-muted text-sm mt-1">Consulta e imprime las facturas por día o el total del evento</p>
+                    <h1 className="page-title">Pedidos y Ferias</h1>
+                    <p className="page-subtitle">Consulta e imprime las facturas por día o el total del evento</p>
                 </div>
-                <button onClick={() => setRole(null)} className="btn btn-secondary text-sm px-4 py-2">
+                <button onClick={() => setRole(null)} className="btn btn-outline btn-sm shrink-0">
+                    <LogOut size={14} strokeWidth={2.2} />
                     Cerrar sesión
                 </button>
             </div>
 
             {/* Banner notificaciones */}
-            <div className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 mb-2 border ${isPushEnabled ? 'bg-green-900/20 border-green-500/30' : 'bg-bg-elevated/40 border-white/10'}`}>
+            <div className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 mb-6 border ${isPushEnabled ? 'bg-accent-green/10 border-accent-green/30' : 'bg-bg-elevated/40 border-white/10'}`}>
                 <div className="flex items-center gap-3">
-                    <span className="text-xl">{isPushEnabled ? '🔔' : '🔕'}</span>
+                    <span className={`icon-chip ${isPushEnabled ? 'icon-chip-green' : 'icon-chip-gray'}`}>
+                        {isPushEnabled ? <BellRing size={18} strokeWidth={2.2} /> : <Bell size={18} strokeWidth={2.2} />}
+                    </span>
                     <div>
                         <div className="text-sm font-bold">{isPushEnabled ? 'Notificaciones activas' : 'Notificaciones desactivadas'}</div>
                         <div className="text-xs text-text-muted">
@@ -303,15 +307,16 @@ export const SaulDashboard: React.FC = () => {
                     {isPushEnabled && (
                         <button
                             onClick={handleTestPush}
-                            className="btn btn-secondary text-xs px-3 py-2 whitespace-nowrap"
+                            className="btn btn-outline btn-sm whitespace-nowrap"
                         >
+                            <Send size={14} strokeWidth={2.2} />
                             Enviar prueba
                         </button>
                     )}
                     {!isPushEnabled && (
                         <button
                             onClick={handleEnableNotifications}
-                            className="btn btn-primary text-xs px-3 py-2 whitespace-nowrap"
+                            className="btn btn-primary btn-sm whitespace-nowrap"
                         >
                             Activar
                         </button>
@@ -320,8 +325,13 @@ export const SaulDashboard: React.FC = () => {
             </div>
 
             {orders.length === 0 && (
-                <div className="card text-center text-text-muted py-12">
-                    No hay pedidos registrados todavía.
+                <div className="card">
+                    <div className="empty-state">
+                        <div className="empty-state-icon">
+                            <ReceiptText size={20} strokeWidth={2} />
+                        </div>
+                        <p>No hay pedidos registrados todavía.</p>
+                    </div>
                 </div>
             )}
 
@@ -330,62 +340,82 @@ export const SaulDashboard: React.FC = () => {
                     <div key={order.title} className="card p-0 overflow-hidden">
                         {/* Cabecera del pedido/feria */}
                         <button
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-bg-elevated/30 transition-colors text-left"
+                            className="w-full flex items-center justify-between gap-4 px-5 py-4 hover:bg-bg-elevated/30 transition-colors text-left"
                             onClick={() => setExpandedOrder(expandedOrder === order.title ? null : order.title)}
+                            aria-expanded={expandedOrder === order.title}
                         >
-                            <div>
-                                <div className="font-bold text-base">{order.title}</div>
-                                <div className="text-text-muted text-sm mt-0.5">
-                                    {order.days.length} {order.days.length === 1 ? 'día' : 'días'}
-                                    {' · '}
-                                    {order.days[order.days.length - 1]?.date}
+                            <div className="flex items-center gap-3 min-w-0">
+                                <span className="icon-chip icon-chip-blue">
+                                    <ReceiptText size={18} strokeWidth={2.2} />
+                                </span>
+                                <div className="min-w-0">
+                                    <div className="font-bold text-base truncate">{order.title}</div>
+                                    <div className="text-text-muted text-sm mt-0.5">
+                                        {order.days.length} {order.days.length === 1 ? 'día' : 'días'}
+                                        {' · '}
+                                        {order.days[order.days.length - 1]?.date}
+                                    </div>
                                 </div>
                             </div>
-                            <span className="text-text-muted text-lg ml-4">
-                                {expandedOrder === order.title ? '▲' : '▼'}
+                            <span className="text-text-muted shrink-0">
+                                {expandedOrder === order.title
+                                    ? <ChevronUp size={18} strokeWidth={2.2} />
+                                    : <ChevronDown size={18} strokeWidth={2.2} />}
                             </span>
                         </button>
 
                         {expandedOrder === order.title && (
-                            <div className="border-t border-bg-elevated">
+                            <div className="border-t border-white/5 animate-fade-in">
                                 {/* Facturas diarias */}
-                                <div className="divide-y divide-bg-elevated">
-                                    {order.days.map(day => (
-                                        <div key={day.date} className="flex items-center justify-between px-5 py-3">
-                                            <div>
-                                                <div className="font-semibold text-sm">{day.date}</div>
-                                                <div className="text-text-muted text-xs mt-0.5">
-                                                    Coste: <span className="text-blue-400 font-bold">{day.expense.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
-                                                    {' · '}
-                                                    Merma: <span className="text-red-400 font-bold">{day.loss.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => printDayInvoice(day, order.title)}
-                                                    className="btn btn-secondary text-xs px-3 py-2 flex items-center gap-1.5"
-                                                >
-                                                    🖨️ Factura del día
-                                                </button>
-                                                <button
-                                                    disabled={!!sendingEmail}
-                                                    onClick={() => handleEmail(() => printDayInvoice(day, order.title, true), day.date)}
-                                                    className="text-xs px-3 py-2 rounded border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 transition-all font-bold flex items-center gap-1.5 disabled:opacity-50"
-                                                >
-                                                    {sendingEmail === day.date ? '⏳ Enviando...' : '✉️ Email'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div className="overflow-x-auto">
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th className="text-right">Coste</th>
+                                                <th className="text-right">Merma</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {order.days.map(day => (
+                                                <tr key={day.date}>
+                                                    <td className="font-semibold whitespace-nowrap">{day.date}</td>
+                                                    <td className="num text-right text-accent-blue font-semibold whitespace-nowrap">{day.expense.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                                                    <td className="num text-right text-accent-red font-semibold whitespace-nowrap">{day.loss.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                                                    <td>
+                                                        <div className="flex justify-end gap-2">
+                                                            <button
+                                                                onClick={() => printDayInvoice(day, order.title)}
+                                                                className="btn btn-outline btn-sm whitespace-nowrap"
+                                                            >
+                                                                <Printer size={14} strokeWidth={2.2} />
+                                                                Factura del día
+                                                            </button>
+                                                            <button
+                                                                disabled={!!sendingEmail}
+                                                                onClick={() => handleEmail(() => printDayInvoice(day, order.title, true), day.date)}
+                                                                className="btn btn-outline btn-sm whitespace-nowrap"
+                                                            >
+                                                                {sendingEmail === day.date
+                                                                    ? <><Loader2 size={14} className="animate-spin" /> Enviando...</>
+                                                                    : <><Mail size={14} strokeWidth={2.2} /> Email</>}
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
 
                                 {/* Factura total del evento */}
-                                <div className="px-5 py-3 bg-bg-elevated/20 flex items-center justify-between border-t border-bg-elevated">
+                                <div className="px-5 py-4 bg-bg-elevated/20 flex flex-wrap items-center justify-between gap-3 border-t border-white/5">
                                     <div>
                                         <div className="font-bold text-sm">Factura Total</div>
                                         <div className="text-text-muted text-xs mt-0.5">
                                             Resumen acumulado de todos los días ·{' '}
-                                            <span className="text-blue-400 font-bold">
+                                            <span className="num text-accent-blue font-semibold">
                                                 {order.days.reduce((s, d) => s + d.expense, 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
                                             </span>
                                         </div>
@@ -393,16 +423,19 @@ export const SaulDashboard: React.FC = () => {
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => printOrderTotalInvoice(order)}
-                                            className="btn btn-primary text-xs px-3 py-2 flex items-center gap-1.5"
+                                            className="btn btn-primary btn-sm whitespace-nowrap"
                                         >
-                                            🖨️ Factura total
+                                            <Printer size={14} strokeWidth={2.2} />
+                                            Factura total
                                         </button>
                                         <button
                                             disabled={!!sendingEmail}
                                             onClick={() => handleEmail(() => printOrderTotalInvoice(order, true), `total-${order.title}`)}
-                                            className="text-xs px-3 py-2 rounded border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 transition-all font-bold flex items-center gap-1.5 disabled:opacity-50"
+                                            className="btn btn-outline btn-sm whitespace-nowrap"
                                         >
-                                            {sendingEmail === `total-${order.title}` ? '⏳ Enviando...' : '✉️ Email'}
+                                            {sendingEmail === `total-${order.title}`
+                                                ? <><Loader2 size={14} className="animate-spin" /> Enviando...</>
+                                                : <><Mail size={14} strokeWidth={2.2} /> Email</>}
                                         </button>
                                     </div>
                                 </div>

@@ -165,7 +165,19 @@
 
   /* ─── Buttons ─── */
   .btn {
-    @apply inline-flex items-center justify-center px-6 py-3 text-sm font-bold rounded-xl border-none cursor-pointer transition-all duration-300 gap-2 no-underline active:scale-[0.97] uppercase tracking-wide;
+    @apply inline-flex items-center justify-center px-5 py-3 text-sm font-semibold rounded-xl border-none cursor-pointer transition-all duration-200 gap-2 no-underline active:scale-[0.97];
+  }
+
+  .btn:focus-visible {
+    @apply outline-none ring-4 ring-accent-blue/30;
+  }
+
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed active:scale-100;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg;
   }
 
   .btn-primary {
@@ -248,6 +260,63 @@
     @apply inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold rounded-md border border-white/10 bg-white/5 text-text-muted font-mono;
     min-width: 18px;
   }
+
+  /* ─── Data Table (shared) ─── */
+  .table-wrap {
+    @apply bg-bg-elevated/20 border border-white/5 rounded-xl overflow-x-auto;
+  }
+
+  .data-table {
+    @apply w-full text-left text-sm;
+  }
+
+  .data-table thead th {
+    @apply px-4 py-3 text-[10px] font-bold uppercase tracking-[0.15em] text-text-muted bg-white/5 whitespace-nowrap;
+  }
+
+  .data-table tbody tr {
+    @apply border-t border-white/5 transition-colors;
+  }
+
+  .data-table tbody tr:hover {
+    @apply bg-white/[0.03];
+  }
+
+  .data-table td {
+    @apply px-4 py-3 align-middle;
+  }
+
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  /* ─── Modal helpers ─── */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in;
+  }
+
+  .modal-panel {
+    @apply card w-full shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto;
+  }
+
+  /* ─── Empty state ─── */
+  .empty-state {
+    @apply flex flex-col items-center justify-center text-center gap-2 py-12 px-6 text-text-muted;
+  }
+
+  .empty-state-icon {
+    @apply w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-text-muted mb-1;
+  }
+
+  /* ─── Icon chip (leading icon for section titles) ─── */
+  .icon-chip {
+    @apply inline-flex w-9 h-9 rounded-xl items-center justify-center shrink-0 border;
+  }
+
+  .icon-chip-blue  { @apply bg-accent-blue/15 border-accent-blue/25 text-accent-blue; }
+  .icon-chip-green { @apply bg-accent-green/15 border-accent-green/25 text-accent-green; }
+  .icon-chip-red   { @apply bg-accent-red/15 border-accent-red/25 text-accent-red; }
+  .icon-chip-gray  { @apply bg-white/5 border-white/10 text-text-muted; }
 }
 
 /* ─── Keyframes ─── */
@@ -296,5 +365,16 @@
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: dark;
+  }
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

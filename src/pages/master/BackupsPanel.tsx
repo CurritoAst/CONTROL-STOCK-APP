@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DatabaseBackup, Download, RotateCcw, Trash2, Search, Loader2, Calendar, Package, ClipboardList, HardDrive, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { BackupSnapshot, BackupTrigger } from '../../types';
@@ -151,13 +152,19 @@ export const BackupsPanel: React.FC = () => {
                     </div>
                 </div>
                 <div className="card border border-yellow-500/30 bg-yellow-500/5">
-                    <h3 className="text-yellow-400 font-bold mb-2">⚠️ Tabla "backups" no encontrada</h3>
+                    <h3 className="text-yellow-400 font-bold mb-2 flex items-center gap-2">
+                        <AlertTriangle size={18} strokeWidth={2.2} className="shrink-0" />
+                        Tabla "backups" no encontrada
+                    </h3>
                     <p className="text-sm text-text-muted mb-4">
                         Para activar esta sección necesitas crear la tabla en Supabase. Abre el SQL editor de Supabase y ejecuta el contenido del archivo:
                     </p>
                     <pre className="bg-black/40 border border-white/10 rounded p-3 text-xs text-accent-blue overflow-x-auto">supabase/migrations/20260426_create_backups.sql</pre>
                     <p className="text-xs text-text-muted mt-3">Una vez creada, recarga la página y podrás ver y gestionar todas las copias.</p>
-                    <button onClick={refresh} className="btn btn-outline mt-4 text-xs">Reintentar</button>
+                    <button onClick={refresh} className="btn btn-outline btn-sm mt-4">
+                        <RefreshCw size={14} strokeWidth={2.2} />
+                        Reintentar
+                    </button>
                 </div>
             </div>
         );
@@ -178,7 +185,9 @@ export const BackupsPanel: React.FC = () => {
                     disabled={creating}
                     className="btn btn-primary disabled:opacity-50"
                 >
-                    {creating ? '⏳ Creando...' : '💾 Crear copia ahora'}
+                    {creating
+                        ? <><Loader2 size={16} className="animate-spin" /> Creando...</>
+                        : <><DatabaseBackup size={16} strokeWidth={2.2} /> Crear copia ahora</>}
                 </button>
             </div>
 
@@ -191,7 +200,7 @@ export const BackupsPanel: React.FC = () => {
                         onChange={e => setSearch(e.target.value)}
                         className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-2 pl-9 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">🔍</span>
+                    <Search size={15} strokeWidth={2.2} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                 </div>
                 <select
                     value={filterTrigger}
@@ -206,10 +215,22 @@ export const BackupsPanel: React.FC = () => {
             </div>
 
             {loading ? (
-                <div className="card text-center py-10 text-text-muted">Cargando copias...</div>
+                <div className="card">
+                    <div className="empty-state">
+                        <Loader2 size={20} className="animate-spin" />
+                        <span className="text-sm">Cargando copias...</span>
+                    </div>
+                </div>
             ) : filtered.length === 0 ? (
-                <div className="card text-center py-10 text-text-muted">
-                    {backups.length === 0 ? 'Aún no hay copias de seguridad.' : 'No hay copias que coincidan con los filtros.'}
+                <div className="card">
+                    <div className="empty-state">
+                        <div className="empty-state-icon">
+                            <DatabaseBackup size={20} strokeWidth={2} />
+                        </div>
+                        <span className="text-sm">
+                            {backups.length === 0 ? 'Aún no hay copias de seguridad.' : 'No hay copias que coincidan con los filtros.'}
+                        </span>
+                    </div>
                 </div>
             ) : (
                 <div className="flex flex-col gap-2">
@@ -231,37 +252,42 @@ export const BackupsPanel: React.FC = () => {
                                             {b.description}
                                         </div>
                                     )}
-                                    <div className="flex items-center gap-3 mt-1.5 text-[10px] text-text-muted font-mono">
-                                        <span>📅 {formatDate(b.created_at)}</span>
-                                        <span>📦 {b.products_count ?? 0} prod</span>
-                                        <span>📋 {b.daily_logs_count ?? 0} pedidos</span>
-                                        <span>📊 {formatBytes(b.size_bytes)}</span>
+                                    <div className="flex items-center gap-3 flex-wrap mt-1.5 text-[10px] text-text-muted font-mono">
+                                        <span className="inline-flex items-center gap-1"><Calendar size={12} strokeWidth={2} className="shrink-0" /> {formatDate(b.created_at)}</span>
+                                        <span className="inline-flex items-center gap-1"><Package size={12} strokeWidth={2} className="shrink-0" /> {b.products_count ?? 0} prod</span>
+                                        <span className="inline-flex items-center gap-1"><ClipboardList size={12} strokeWidth={2} className="shrink-0" /> {b.daily_logs_count ?? 0} pedidos</span>
+                                        <span className="inline-flex items-center gap-1"><HardDrive size={12} strokeWidth={2} className="shrink-0" /> {formatBytes(b.size_bytes)}</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap shrink-0">
                                     <button
                                         onClick={() => handleDownload(b)}
                                         disabled={isDownloading || isRestoring}
-                                        className="btn btn-outline text-xs py-1.5 px-3 disabled:opacity-50"
+                                        className="btn btn-outline btn-sm disabled:opacity-50"
                                         title="Descargar como JSON"
                                     >
-                                        {isDownloading ? '⏳' : '💾 Descargar'}
+                                        {isDownloading
+                                            ? <Loader2 size={14} className="animate-spin" />
+                                            : <><Download size={14} strokeWidth={2.2} /> Descargar</>}
                                     </button>
                                     <button
                                         onClick={() => setConfirmRestore(b)}
                                         disabled={isDownloading || isRestoring}
-                                        className="btn btn-outline border-accent-green/40 text-accent-green hover:bg-accent-green/10 text-xs py-1.5 px-3 disabled:opacity-50"
+                                        className="btn btn-outline btn-sm border-accent-green/40 text-accent-green hover:bg-accent-green/10 disabled:opacity-50"
                                         title="Restaurar este estado"
                                     >
-                                        {isRestoring ? '⏳ Restaurando...' : '↺ Restaurar'}
+                                        {isRestoring
+                                            ? <><Loader2 size={14} className="animate-spin" /> Restaurando...</>
+                                            : <><RotateCcw size={14} strokeWidth={2.2} /> Restaurar</>}
                                     </button>
                                     <button
                                         onClick={() => setConfirmDelete(b)}
                                         disabled={isDownloading || isRestoring}
-                                        className="btn btn-outline border-accent-red/40 text-accent-red hover:bg-accent-red/10 text-xs py-1.5 px-3 disabled:opacity-50"
+                                        className="btn btn-outline btn-sm border-accent-red/40 text-accent-red hover:bg-accent-red/10 disabled:opacity-50"
                                         title="Borrar copia"
+                                        aria-label="Borrar copia"
                                     >
-                                        🗑
+                                        <Trash2 size={14} strokeWidth={2.2} />
                                     </button>
                                 </div>
                             </div>
@@ -272,16 +298,22 @@ export const BackupsPanel: React.FC = () => {
 
             {/* Restore confirm modal */}
             {confirmRestore && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-                    <div className="card w-full max-w-md border border-accent-green/30">
-                        <h3 className="text-xl font-bold mb-2 text-accent-green">↺ Restaurar copia</h3>
+                <div className="modal-overlay">
+                    <div className="modal-panel max-w-md border-accent-green/30">
+                        <div className="flex items-center gap-3 mb-3">
+                            <span className="icon-chip icon-chip-green">
+                                <RotateCcw size={18} strokeWidth={2.2} />
+                            </span>
+                            <h3 className="text-xl font-bold text-accent-green">Restaurar copia</h3>
+                        </div>
                         <p className="text-sm text-text-muted mb-1">
                             Estás a punto de restaurar la BD al estado de:
                         </p>
                         <p className="font-bold mb-1">{confirmRestore.label || '(sin etiqueta)'}</p>
                         <p className="text-xs text-text-muted mb-4 font-mono">{formatDate(confirmRestore.created_at)}</p>
-                        <p className="text-xs text-yellow-400 mb-5">
-                            ⚠️ Antes de aplicar se creará automáticamente otra copia de seguridad del estado actual, así que podrás revertir.
+                        <p className="text-xs text-yellow-400 mb-5 flex items-start gap-1.5">
+                            <AlertTriangle size={14} strokeWidth={2.2} className="shrink-0 mt-0.5" />
+                            <span>Antes de aplicar se creará automáticamente otra copia de seguridad del estado actual, así que podrás revertir.</span>
                         </p>
                         <div className="flex gap-3">
                             <button onClick={() => setConfirmRestore(null)} className="btn btn-outline flex-1">Cancelar</button>
@@ -293,9 +325,14 @@ export const BackupsPanel: React.FC = () => {
 
             {/* Delete confirm modal */}
             {confirmDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-                    <div className="card w-full max-w-md border border-accent-red/30">
-                        <h3 className="text-xl font-bold mb-2 text-accent-red">🗑 Borrar copia</h3>
+                <div className="modal-overlay">
+                    <div className="modal-panel max-w-md border-accent-red/30">
+                        <div className="flex items-center gap-3 mb-3">
+                            <span className="icon-chip icon-chip-red">
+                                <Trash2 size={18} strokeWidth={2.2} />
+                            </span>
+                            <h3 className="text-xl font-bold text-accent-red">Borrar copia</h3>
+                        </div>
                         <p className="text-sm text-text-muted mb-1">¿Borrar la copia:</p>
                         <p className="font-bold mb-1">{confirmDelete.label || '(sin etiqueta)'}</p>
                         <p className="text-xs text-text-muted mb-5 font-mono">{formatDate(confirmDelete.created_at)}</p>

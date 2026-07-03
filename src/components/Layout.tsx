@@ -1,10 +1,15 @@
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
+import {
+    LayoutDashboard, Store, FolderKanban, ClipboardList, Beef, CalendarDays,
+    TrendingDown, DatabaseBackup, LogOut, FileText, BarChart3,
+    Crown, ChefHat, Eye
+} from 'lucide-react';
 
 type TabDef = {
     id: string;
     label: string;
-    icon: string;
+    icon: React.ComponentType<{ size?: number | string; className?: string; strokeWidth?: number | string }>;
     shortLabel: string;
     badge?: number;
 };
@@ -35,29 +40,29 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
         {
             section: 'Principal',
             items: [
-                { id: 'PANEL', label: 'Panel Financiero', icon: '📊', shortLabel: 'Panel' },
-                { id: 'POS', label: 'Punto de Venta', icon: '🏪', shortLabel: 'POS' },
+                { id: 'PANEL', label: 'Panel Financiero', icon: LayoutDashboard, shortLabel: 'Panel' },
+                { id: 'POS', label: 'Punto de Venta', icon: Store, shortLabel: 'POS' },
             ]
         },
         {
             section: 'Operaciones',
             items: [
-                { id: 'CREATE', label: 'Gestión Diaria', icon: '🗂', shortLabel: 'Gestión' },
-                { id: 'AUDIT', label: 'Pedidos Diarios', icon: '📋', shortLabel: 'Pedidos', badge: pendingAudits },
-                { id: 'CATALOG', label: 'Catálogo de Productos', icon: '🥩', shortLabel: 'Catálogo' },
-                { id: 'CALENDAR', label: 'Calendario', icon: '📅', shortLabel: 'Calend.' },
+                { id: 'CREATE', label: 'Gestión Diaria', icon: FolderKanban, shortLabel: 'Gestión' },
+                { id: 'AUDIT', label: 'Pedidos Diarios', icon: ClipboardList, shortLabel: 'Pedidos', badge: pendingAudits },
+                { id: 'CATALOG', label: 'Catálogo de Productos', icon: Beef, shortLabel: 'Catálogo' },
+                { id: 'CALENDAR', label: 'Calendario', icon: CalendarDays, shortLabel: 'Calend.' },
             ]
         },
         {
             section: 'Análisis',
             items: [
-                { id: 'ANALYTICS', label: 'Control de Pérdidas', icon: '📈', shortLabel: 'Pérdidas' },
+                { id: 'ANALYTICS', label: 'Control de Pérdidas', icon: TrendingDown, shortLabel: 'Pérdidas' },
             ]
         },
         {
             section: 'Sistema',
             items: [
-                { id: 'BACKUPS', label: 'Copias de Seguridad', icon: '💾', shortLabel: 'Backups' },
+                { id: 'BACKUPS', label: 'Copias de Seguridad', icon: DatabaseBackup, shortLabel: 'Backups' },
             ]
         }
     ];
@@ -66,17 +71,18 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
         {
             section: 'Operaciones',
             items: [
-                { id: 'PEDIDO', label: 'Pedido del Día', icon: '📝', shortLabel: 'Pedido' },
-                { id: 'REPORTES', label: 'Reportes de Uso', icon: '📊', shortLabel: 'Reportes' },
+                { id: 'PEDIDO', label: 'Pedido del Día', icon: FileText, shortLabel: 'Pedido' },
+                { id: 'REPORTES', label: 'Reportes de Uso', icon: BarChart3, shortLabel: 'Reportes' },
             ]
         }
     ];
 
     const sections = role === 'MASTER' ? masterSections : role === 'EMPLOYEE' ? employeeSections : [];
     const flatTabs: TabDef[] = sections.flatMap(s => s.items);
+    const crowdedNav = flatTabs.length > 5;
 
     const roleLabel = role === 'MASTER' ? 'Master' : role === 'EMPLOYEE' ? 'Cocina' : 'Viewer';
-    const roleIcon = role === 'MASTER' ? '👑' : role === 'EMPLOYEE' ? '🧑‍🍳' : '👁️';
+    const RoleIcon = role === 'MASTER' ? Crown : role === 'EMPLOYEE' ? ChefHat : Eye;
 
     return (
         <div className="flex h-screen bg-bg-primary overflow-hidden text-text-primary">
@@ -94,7 +100,9 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
                             <div className="text-sm font-extrabold tracking-tight leading-tight">DukeControl</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="status-dot status-dot-live" />
-                                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">{roleIcon} {roleLabel}</span>
+                                <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">
+                                    <RoleIcon size={10} strokeWidth={2.5} /> {roleLabel}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -108,15 +116,20 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
                             <div className="flex flex-col gap-1">
                                 {section.items.map(tab => {
                                     const isActive = activeTab === tab.id;
+                                    const Icon = tab.icon;
                                     return (
                                         <button
                                             key={tab.id}
                                             onClick={() => onTabChange && onTabChange(tab.id)}
                                             className={`nav-item ${isActive ? 'nav-item-active' : 'nav-item-inactive'}`}
                                         >
-                                            <span className="flex items-center gap-3">
-                                                <span className={`text-base transition-transform ${isActive ? '' : 'grayscale opacity-60'}`}>{tab.icon}</span>
-                                                <span>{tab.label}</span>
+                                            <span className="flex items-center gap-3 min-w-0">
+                                                <Icon
+                                                    size={17}
+                                                    strokeWidth={isActive ? 2.4 : 2}
+                                                    className={`shrink-0 transition-colors ${isActive ? 'text-accent-blue' : 'text-text-muted'}`}
+                                                />
+                                                <span className="truncate">{tab.label}</span>
                                             </span>
                                             {(tab.badge || 0) > 0 && (
                                                 <span className="bg-accent-red/90 text-white text-[10px] font-black px-1.5 min-w-5 h-5 flex items-center justify-center rounded-md shadow-sm">
@@ -135,9 +148,9 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
                 <div className="p-4 border-t border-white/5">
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold uppercase tracking-wide text-text-secondary hover:text-white transition-all"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-text-secondary hover:text-white transition-all"
                     >
-                        <span className="text-sm">↩</span>
+                        <LogOut size={14} strokeWidth={2.2} />
                         Cerrar Sesión
                     </button>
                 </div>
@@ -157,14 +170,18 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
                             <div className="text-sm font-extrabold tracking-tight leading-none">DukeControl</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="status-dot status-dot-live" />
-                                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">{roleIcon} {roleLabel}</span>
+                                <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">
+                                    <RoleIcon size={10} strokeWidth={2.5} /> {roleLabel}
+                                </span>
                             </div>
                         </div>
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-text-muted hover:text-white transition-colors"
+                        aria-label="Cerrar sesión"
+                        className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-text-muted hover:text-white transition-colors"
                     >
+                        <LogOut size={12} strokeWidth={2.4} />
                         Salir
                     </button>
                 </header>
@@ -178,22 +195,25 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
 
                 {/* ─── Mobile Bottom Nav ─── */}
                 <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-bg-secondary/85 backdrop-blur-2xl border-t border-white/5 shadow-[0_-20px_40px_-10px_rgba(0,0,0,0.6)]">
-                    <div className="flex justify-around items-stretch px-1 pt-2 pb-safe pb-3">
+                    <div className={`flex items-stretch px-1 pt-2 pb-safe pb-3 ${crowdedNav ? 'overflow-x-auto snap-x [-webkit-overflow-scrolling:touch]' : 'justify-around'}`}>
                         {flatTabs.map(tab => {
                             const isActive = activeTab === tab.id;
+                            const Icon = tab.icon;
                             return (
                                 <button
                                     key={tab.id}
                                     onClick={() => onTabChange && onTabChange(tab.id)}
-                                    className="flex-1 flex flex-col items-center justify-center gap-1 relative py-1.5 min-w-0"
+                                    className={`flex flex-col items-center justify-center gap-1 relative py-1.5 ${crowdedNav ? 'shrink-0 min-w-[68px] snap-start' : 'flex-1 min-w-0'}`}
                                 >
                                     {/* Active indicator */}
                                     {isActive && (
                                         <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-accent-blue to-accent-green rounded-full" />
                                     )}
-                                    <div className={`text-lg transition-all ${isActive ? 'scale-110' : 'grayscale opacity-50'}`}>
-                                        {tab.icon}
-                                    </div>
+                                    <Icon
+                                        size={19}
+                                        strokeWidth={isActive ? 2.4 : 2}
+                                        className={`transition-all ${isActive ? 'text-accent-blue scale-110' : 'text-text-muted opacity-70'}`}
+                                    />
                                     <div className={`text-[9px] font-bold uppercase tracking-tight truncate max-w-full px-1 ${isActive ? 'text-accent-blue' : 'text-text-muted'}`}>
                                         {tab.shortLabel}
                                     </div>
@@ -211,10 +231,12 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
 
             {/* ─── Logout Modal ─── */}
             {showLogoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+                <div className="modal-overlay">
                     <div className="card w-full max-w-sm shadow-2xl border border-white/10">
                         <div className="text-center mb-6">
-                            <div className="inline-flex w-12 h-12 rounded-full bg-accent-red/15 border border-accent-red/30 items-center justify-center text-2xl mb-3">↩</div>
+                            <div className="inline-flex w-12 h-12 rounded-full bg-accent-red/15 border border-accent-red/30 items-center justify-center text-accent-red mb-3">
+                                <LogOut size={20} strokeWidth={2.2} />
+                            </div>
                             <h3 className="text-xl font-bold mb-1.5">¿Cerrar Sesión?</h3>
                             <p className="text-sm text-text-muted">Tendrás que volver a introducir tus credenciales.</p>
                         </div>

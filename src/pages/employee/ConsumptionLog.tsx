@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { DailyLog, InventoryItem } from '../../types';
+import { PackageOpen, Flag, Search, X, Loader2, Minus, Plus, Info, Lock } from 'lucide-react';
 
 export const ConsumptionLog: React.FC<{
     currentLog?: DailyLog,
@@ -145,15 +146,20 @@ export const ConsumptionLog: React.FC<{
         : items.filter(item => item.product.name.toLowerCase().includes(search.trim().toLowerCase()));
 
     return (
-        <div className="card">
+        <div className="card animate-fade-in">
             <div className="flex justify-between items-start mb-6 gap-3">
-                <div>
-                    <h2 className="text-2xl font-bold mb-1">{aggregatedLogs ? '🏁 Devolución Total' : '📦 Productos Sobrantes'}</h2>
-                    <p className="text-text-muted text-sm">
-                        {aggregatedLogs
-                            ? `Indica el stock TOTAL sobrante tras finalizar la feria ${displayTitle}.`
-                            : 'Indica cuántas unidades han sobrado de cada producto para devolverlas al almacén.'}
-                    </p>
+                <div className="flex items-start gap-3 min-w-0">
+                    <span className={`icon-chip ${aggregatedLogs ? 'icon-chip-blue' : 'icon-chip-green'} mt-0.5`}>
+                        {aggregatedLogs ? <Flag size={18} strokeWidth={2.2} /> : <PackageOpen size={18} strokeWidth={2.2} />}
+                    </span>
+                    <div className="min-w-0">
+                        <h2 className="text-2xl font-bold mb-1">{aggregatedLogs ? 'Devolución Total' : 'Productos Sobrantes'}</h2>
+                        <p className="text-text-muted text-sm">
+                            {aggregatedLogs
+                                ? `Indica el stock TOTAL sobrante tras finalizar la feria ${displayTitle}.`
+                                : 'Indica cuántas unidades han sobrado de cada producto para devolverlas al almacén.'}
+                        </p>
+                    </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                     <span className="badge badge-green shrink-0">{displayDate}</span>
@@ -164,7 +170,7 @@ export const ConsumptionLog: React.FC<{
             {aggregatedLogs && (
                 <div className="bg-accent-blue/10 border border-accent-blue/20 p-4 rounded-lg mb-6 text-sm">
                     <p className="flex items-center gap-2">
-                        <span className="text-lg">ℹ️</span>
+                        <Info size={18} strokeWidth={2.2} className="text-accent-blue shrink-0" />
                         Se han acumulado todos los productos enviados durante los {aggregatedLogs.length} días de feria para realizar un cierre global.
                     </p>
                 </div>
@@ -179,13 +185,14 @@ export const ConsumptionLog: React.FC<{
                     onChange={e => setSearch(e.target.value)}
                     className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-3 pl-10 text-white outline-none focus:border-accent-blue placeholder:text-text-muted"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">🔍</span>
+                <Search size={16} strokeWidth={2.2} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                 {search && (
                     <button
                         onClick={() => setSearch('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white transition-colors"
                         title="Limpiar búsqueda"
-                    >✕</button>
+                        aria-label="Limpiar búsqueda"
+                    ><X size={16} strokeWidth={2.2} /></button>
                 )}
             </div>
 
@@ -199,9 +206,10 @@ export const ConsumptionLog: React.FC<{
 
             <div className="flex flex-col divide-y divide-white/5 mb-6">
                 {visibleItems.length === 0 && (
-                    <p className="text-text-muted text-center py-6 text-sm">
-                        No hay productos que coincidan con "{search}".
-                    </p>
+                    <div className="empty-state">
+                        <div className="empty-state-icon"><Search size={20} strokeWidth={2} /></div>
+                        <p className="text-sm">No hay productos que coincidan con "{search}".</p>
+                    </div>
                 )}
                 {visibleItems.map(item => {
                     const leftover = sobrantes[item.product.id] ?? 0;
@@ -232,9 +240,9 @@ export const ConsumptionLog: React.FC<{
                                     <button
                                         type="button"
                                         aria-label="Restar"
-                                        className="w-7 h-7 rounded-md border border-white/10 bg-bg-elevated/40 hover:bg-white/10 text-text-muted hover:text-white font-bold flex items-center justify-center transition-colors shrink-0"
+                                        className="w-7 h-7 rounded-md border border-white/10 bg-bg-elevated/40 hover:bg-white/10 text-text-muted hover:text-white flex items-center justify-center transition-colors shrink-0"
                                         onClick={() => setSobrantes(prev => ({ ...prev, [item.product.id]: Math.max(0, (prev[item.product.id] ?? 0) - 1) }))}
-                                    >−</button>
+                                    ><Minus size={14} strokeWidth={2.4} /></button>
                                     <input
                                         type="number"
                                         min="0"
@@ -247,9 +255,9 @@ export const ConsumptionLog: React.FC<{
                                     <button
                                         type="button"
                                         aria-label="Sumar"
-                                        className="w-7 h-7 rounded-md border border-white/10 bg-bg-elevated/40 hover:bg-white/10 text-text-muted hover:text-white font-bold flex items-center justify-center transition-colors shrink-0"
+                                        className="w-7 h-7 rounded-md border border-white/10 bg-bg-elevated/40 hover:bg-white/10 text-text-muted hover:text-white flex items-center justify-center transition-colors shrink-0"
                                         onClick={() => setSobrantes(prev => ({ ...prev, [item.product.id]: Math.min(item.prepared, (prev[item.product.id] ?? 0) + 1) }))}
-                                    >+</button>
+                                    ><Plus size={14} strokeWidth={2.4} /></button>
                                 </div>
                             </div>
 
@@ -267,7 +275,7 @@ export const ConsumptionLog: React.FC<{
 
             <div className="flex items-center justify-between mb-4 text-sm text-text-muted">
                 <span>Total unidades a devolver:</span>
-                <span className="font-bold text-accent-blue text-base">{totalSobrantes}</span>
+                <span className="font-mono tabular-nums font-bold text-accent-blue text-base">{totalSobrantes}</span>
             </div>
 
             <button
@@ -275,12 +283,16 @@ export const ConsumptionLog: React.FC<{
                 onClick={handleEndDay}
                 disabled={isSaving}
             >
-                {isSaving ? <span className="animate-spin text-lg">⏳</span> : null}
+                {isSaving
+                    ? <Loader2 size={18} className="animate-spin" />
+                    : aggregatedLogs
+                        ? <Flag size={18} strokeWidth={2.2} />
+                        : <Lock size={18} strokeWidth={2.2} />}
                 {isSaving
                     ? 'Procesando...'
                     : aggregatedLogs
-                        ? '🏁 Finalizar Feria y Devolver Todo'
-                        : '🔒 Enviar Sobrantes y Finalizar'}
+                        ? 'Finalizar Feria y Devolver Todo'
+                        : 'Enviar Sobrantes y Finalizar'}
             </button>
         </div>
     );

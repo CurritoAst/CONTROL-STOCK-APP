@@ -1,4 +1,22 @@
 import React, { useMemo, useState } from 'react';
+import {
+    Activity,
+    BarChart3,
+    ChevronDown,
+    ChevronRight,
+    Info,
+    Loader2,
+    Mail,
+    Pencil,
+    Printer,
+    Save,
+    Search,
+    Store,
+    Trash2,
+    TrendingDown,
+    Wallet,
+    X,
+} from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { sendViaGmail } from '../../lib/gmailSend';
@@ -595,13 +613,18 @@ export const FinancialFeriaReport: React.FC = () => {
         <div className="animate-fade-in space-y-8 mt-6">
             <div className="card">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h2 className="text-2xl mb-1">📊 Análisis Financiero Histórico</h2>
-                        <p className="text-text-secondary text-sm">Gestiona y consulta el desglose económico de ferias y pedidos anteriores.</p>
+                    <div className="flex items-start gap-3 min-w-0">
+                        <span className="icon-chip icon-chip-blue" aria-hidden="true">
+                            <BarChart3 size={18} strokeWidth={2.2} />
+                        </span>
+                        <div className="min-w-0">
+                            <h2 className="text-2xl mb-1">Análisis Financiero Histórico</h2>
+                            <p className="text-text-secondary text-sm">Gestiona y consulta el desglose económico de ferias y pedidos anteriores.</p>
+                        </div>
                     </div>
-                    <div className="w-full sm:w-80">
+                    <div className="w-full sm:w-80 shrink-0">
                         <select
-                            className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full font-bold"
+                            className="bg-bg-primary/50 border border-white/10 rounded-lg p-2.5 text-white outline-none focus:border-accent-blue w-full font-bold"
                             value={selectedOrderId}
                             onChange={(e) => { setSelectedOrderId(e.target.value); setExpandedDay(null); }}
                         >
@@ -620,22 +643,34 @@ export const FinancialFeriaReport: React.FC = () => {
 
             {selectedOrder ? (
                 <div className="animate-fade-in space-y-6">
-                    <div className="bg-bg-elevated/30 p-4 rounded border border-white/10">
-                        <h3 className="text-xl font-bold text-accent-blue">🏠 {selectedOrder.title}</h3>
+                    <div className="bg-bg-elevated/30 p-4 rounded-xl border border-white/10 flex items-center gap-3">
+                        <span className="icon-chip icon-chip-blue" aria-hidden="true">
+                            <Store size={18} strokeWidth={2.2} />
+                        </span>
+                        <h3 className="text-xl font-bold text-accent-blue truncate" title={selectedOrder.title}>{selectedOrder.title}</h3>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="card text-center bg-bg-elevated/20">
-                            <div className="text-[10px] uppercase text-text-muted mb-1 font-bold">Consumo Total</div>
-                            <div className="text-3xl font-bold text-accent-blue">{selectedOrder.expense.toLocaleString('es-ES')} €</div>
+                        <div className="stat-card">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="section-label">Consumo Total</span>
+                                <Wallet size={16} strokeWidth={2.2} className="text-accent-blue" aria-hidden="true" />
+                            </div>
+                            <div className="text-3xl font-bold text-accent-blue num">{selectedOrder.expense.toLocaleString('es-ES')} €</div>
                         </div>
-                        <div className="card text-center bg-bg-elevated/20">
-                            <div className="text-[10px] uppercase text-text-muted mb-1 font-bold">Merma Total</div>
-                            <div className="text-3xl font-bold text-accent-red">{selectedOrder.loss.toLocaleString('es-ES')} €</div>
+                        <div className="stat-card">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="section-label">Merma Total</span>
+                                <TrendingDown size={16} strokeWidth={2.2} className="text-accent-red" aria-hidden="true" />
+                            </div>
+                            <div className="text-3xl font-bold text-accent-red num">{selectedOrder.loss.toLocaleString('es-ES')} €</div>
                         </div>
-                        <div className="card text-center bg-bg-elevated/20">
-                            <div className="text-[10px] uppercase text-text-muted mb-1 font-bold">Eficiencia</div>
-                            <div className="text-3xl font-bold text-accent-green">{selectedOrder.efficiency}%</div>
+                        <div className="stat-card">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="section-label">Eficiencia</span>
+                                <Activity size={16} strokeWidth={2.2} className="text-accent-green" aria-hidden="true" />
+                            </div>
+                            <div className="text-3xl font-bold text-accent-green num">{selectedOrder.efficiency}%</div>
                         </div>
                     </div>
 
@@ -648,29 +683,31 @@ export const FinancialFeriaReport: React.FC = () => {
                                 className="w-full flex items-center justify-between gap-2 mb-4 border-l-2 border-accent-blue pl-3 group select-none"
                             >
                                 <h4 className="text-sm font-bold uppercase text-text-muted group-hover:text-white transition-colors flex items-center gap-2">
-                                    <span className="text-text-muted">{productBreakdownOpen ? '▾' : '▸'}</span>
+                                    {productBreakdownOpen
+                                        ? <ChevronDown size={14} strokeWidth={2.4} className="text-text-muted shrink-0" aria-hidden="true" />
+                                        : <ChevronRight size={14} strokeWidth={2.4} className="text-text-muted shrink-0" aria-hidden="true" />}
                                     Desglose por Producto
                                     <span className="text-text-muted/60 normal-case font-normal">({selectedOrder.productTotals.length})</span>
                                 </h4>
                             </button>
                             {productBreakdownOpen && (
-                                <div className="bg-bg-elevated/20 border border-white/5 rounded-lg overflow-hidden animate-fade-in">
-                                    <table className="w-full text-left text-xs">
-                                        <thead className="bg-white/5 text-text-muted uppercase">
+                                <div className="table-wrap animate-fade-in">
+                                    <table className="data-table text-xs">
+                                        <thead>
                                             <tr>
-                                                <th className="p-3">Producto</th>
-                                                <th className="p-3 text-center">Consumo</th>
-                                                <th className="p-3 text-center">Merma</th>
-                                                <th className="p-3 text-right">Coste (€)</th>
+                                                <th>Producto</th>
+                                                <th className="text-center">Consumo</th>
+                                                <th className="text-center">Merma</th>
+                                                <th className="text-right">Coste (€)</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-white/5">
+                                        <tbody>
                                             {selectedOrder.productTotals.map((prod: any) => (
-                                                <tr key={prod.name} className="hover:bg-white/5">
-                                                    <td className="p-3 font-bold">{prod.name}</td>
-                                                    <td className="p-3 text-center">{prod.consumed}</td>
-                                                    <td className="p-3 text-center text-accent-red">{prod.loss}</td>
-                                                    <td className="p-3 text-right font-bold">{prod.cost.toLocaleString('es-ES')} €</td>
+                                                <tr key={prod.name}>
+                                                    <td className="font-bold">{prod.name}</td>
+                                                    <td className="text-center num">{prod.consumed}</td>
+                                                    <td className="text-center num text-accent-red">{prod.loss}</td>
+                                                    <td className="text-right num font-bold">{prod.cost.toLocaleString('es-ES')} €</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -685,72 +722,80 @@ export const FinancialFeriaReport: React.FC = () => {
                                 <div className="flex gap-2 flex-wrap">
                                     <button
                                         onClick={() => openTotalEditor(selectedOrder.title)}
-                                        className="text-[11px] px-3 py-1.5 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold"
+                                        className="btn btn-sm btn-outline border-accent-green/40 text-accent-green hover:bg-accent-green/10 font-bold"
                                         title="Editar preparado/consumido agregado del evento"
                                     >
-                                        ✏️ Editar Total
+                                        <Pencil size={14} strokeWidth={2.2} aria-hidden="true" /> Editar Total
                                     </button>
                                     <button
                                         onClick={() => downloadOrderTotalInvoice(selectedOrder)}
-                                        className="text-[11px] px-3 py-1.5 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold"
+                                        className="btn btn-sm btn-outline border-accent-green/40 text-accent-green hover:bg-accent-green/10 font-bold"
                                     >
-                                        🖨️ Imprimir Total
+                                        <Printer size={14} strokeWidth={2.2} aria-hidden="true" /> Imprimir Total
                                     </button>
                                     <button
                                         disabled={!!sendingEmail}
                                         onClick={() => handleEmail(() => downloadOrderTotalInvoice(selectedOrder, true), 'total')}
-                                        className="text-[11px] px-3 py-1.5 rounded border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 transition-all font-bold disabled:opacity-50"
+                                        className="btn btn-sm btn-outline border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 font-bold"
                                     >
-                                        {sendingEmail === 'total' ? '⏳ Enviando...' : '✉️ Email'}
+                                        {sendingEmail === 'total'
+                                            ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Enviando...</>
+                                            : <><Mail size={14} strokeWidth={2.2} aria-hidden="true" /> Email</>}
                                     </button>
                                 </div>
                             </div>
-                            <div className="bg-bg-elevated/20 border border-white/5 rounded-lg overflow-x-auto">
-                                <table className="w-full text-left text-xs min-w-[500px]">
-                                    <thead className="bg-white/5 text-text-muted uppercase">
+                            <div className="table-wrap">
+                                <table className="data-table text-xs min-w-[500px]">
+                                    <thead>
                                         <tr>
-                                            <th className="p-3">Día</th>
-                                            <th className="p-3">Consumo</th>
-                                            <th className="p-3 text-center">Merma</th>
-                                            <th className="p-3 text-right">Imprimir</th>
+                                            <th>Día</th>
+                                            <th className="text-right">Consumo</th>
+                                            <th className="text-right">Merma</th>
+                                            <th className="text-right">Imprimir</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-white/5">
+                                    <tbody>
                                         {selectedOrder.dailyBreakdown.map((day: any) => {
                                             const isOpen = expandedDay === day.date;
                                             return (
                                                 <React.Fragment key={day.date}>
                                                     <tr
-                                                        className="hover:bg-white/5 cursor-pointer select-none"
+                                                        className="cursor-pointer select-none"
                                                         onClick={() => setExpandedDay(isOpen ? null : day.date)}
                                                     >
-                                                        <td className="p-3 font-bold tracking-tight text-accent-blue">
-                                                            <span className="mr-1 text-text-muted">{isOpen ? '▾' : '▸'}</span>
-                                                            {day.date}
+                                                        <td className="font-bold tracking-tight text-accent-blue">
+                                                            <span className="flex items-center gap-1">
+                                                                {isOpen
+                                                                    ? <ChevronDown size={14} strokeWidth={2.4} className="text-text-muted shrink-0" aria-hidden="true" />
+                                                                    : <ChevronRight size={14} strokeWidth={2.4} className="text-text-muted shrink-0" aria-hidden="true" />}
+                                                                {day.date}
+                                                            </span>
                                                         </td>
-                                                        <td className="p-3 font-bold">{day.expense.toLocaleString('es-ES')} €</td>
-                                                        <td className="p-3 text-center text-accent-red font-bold">{day.loss.toLocaleString('es-ES')} €</td>
-                                                        <td className="p-3 text-right">
+                                                        <td className="text-right font-bold num">{day.expense.toLocaleString('es-ES')} €</td>
+                                                        <td className="text-right text-accent-red font-bold num">{day.loss.toLocaleString('es-ES')} €</td>
+                                                        <td className="text-right">
                                                             <div className="flex gap-2 justify-end flex-wrap">
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); downloadDayInvoice(day, selectedOrder.title); }}
-                                                                    className="text-[11px] px-3 py-1 rounded border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-all font-bold"
+                                                                    className="btn btn-sm btn-outline border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 font-bold"
                                                                 >
-                                                                    🖨️ Imprimir
+                                                                    <Printer size={14} strokeWidth={2.2} aria-hidden="true" /> Imprimir
                                                                 </button>
                                                                 <button
                                                                     disabled={!!sendingEmail}
                                                                     onClick={(e) => { e.stopPropagation(); handleEmail(() => downloadDayInvoice(day, selectedOrder.title, true), day.date); }}
-                                                                    className="text-[11px] px-3 py-1 rounded border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 transition-all font-bold disabled:opacity-50"
+                                                                    className="btn btn-sm btn-outline border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 font-bold"
                                                                 >
-                                                                    {sendingEmail === day.date ? '⏳ Enviando...' : '✉️ Email'}
+                                                                    {sendingEmail === day.date
+                                                                        ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Enviando...</>
+                                                                        : <><Mail size={14} strokeWidth={2.2} aria-hidden="true" /> Email</>}
                                                                 </button>
                                                                 {day.logIds.length === 1 ? (
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); openEditor(day.logIds[0], day.date, selectedOrder.title); }}
-                                                                        className="text-[11px] px-3 py-1 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold"
+                                                                        className="btn btn-sm btn-outline border-accent-green/40 text-accent-green hover:bg-accent-green/10 font-bold"
                                                                     >
-                                                                        ✏️ Editar
+                                                                        <Pencil size={14} strokeWidth={2.2} aria-hidden="true" /> Editar
                                                                     </button>
                                                                 ) : (
                                                                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -763,10 +808,10 @@ export const FinancialFeriaReport: React.FC = () => {
                                                                                 <button
                                                                                     key={lid}
                                                                                     onClick={(e) => { e.stopPropagation(); openEditor(lid, day.date, selectedOrder.title); }}
-                                                                                    className="text-[10px] px-2 py-1 rounded border border-accent-green/40 text-accent-green hover:bg-accent-green/10 transition-all font-bold whitespace-nowrap"
+                                                                                    className="btn btn-sm btn-outline border-accent-green/40 text-accent-green hover:bg-accent-green/10 font-bold whitespace-nowrap px-2 text-[10px]"
                                                                                     title={`Editar ${fullTitle}`}
                                                                                 >
-                                                                                    ✏️ {label}
+                                                                                    <Pencil size={12} strokeWidth={2.2} aria-hidden="true" /> {label}
                                                                                 </button>
                                                                             );
                                                                         })}
@@ -799,10 +844,10 @@ export const FinancialFeriaReport: React.FC = () => {
                                                                                                 return (
                                                                                                     <tr key={item.product.id} className="border-b border-white/5 last:border-0">
                                                                                                         <td className="py-1.5 pl-2 font-medium">{item.product.name}</td>
-                                                                                                        <td className="py-1.5 text-center text-text-muted">{item.prepared} prep</td>
-                                                                                                        <td className="py-1.5 text-center">{item.consumed} cons</td>
-                                                                                                        <td className="py-1.5 text-center text-accent-red">{sobrante} sob</td>
-                                                                                                        <td className="py-1.5 text-right font-bold pr-2">{cost.toLocaleString('es-ES')} €</td>
+                                                                                                        <td className="py-1.5 text-center text-text-muted num">{item.prepared} prep</td>
+                                                                                                        <td className="py-1.5 text-center num">{item.consumed} cons</td>
+                                                                                                        <td className="py-1.5 text-center text-accent-red num">{sobrante} sob</td>
+                                                                                                        <td className="py-1.5 text-right font-bold pr-2 num">{cost.toLocaleString('es-ES')} €</td>
                                                                                                     </tr>
                                                                                                 );
                                                                                             })}
@@ -825,15 +870,20 @@ export const FinancialFeriaReport: React.FC = () => {
                     </div>
                 </div>
             ) : (
-                <div className="card py-20 text-center opacity-60 italic text-text-secondary">
-                    Selecciona un pedido para visualizar el análisis financiero detallado.
+                <div className="card">
+                    <div className="empty-state">
+                        <div className="empty-state-icon">
+                            <BarChart3 size={20} strokeWidth={2} aria-hidden="true" />
+                        </div>
+                        <p className="italic text-text-secondary">Selecciona un pedido para visualizar el análisis financiero detallado.</p>
+                    </div>
                 </div>
             )}
         </div>
 
         {/* ─── Edit TOTAL Modal ─── */}
         {editingTotal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+            <div className="modal-overlay">
                 <div className="bg-bg-elevated border border-white/10 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
                     <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4">
                         <div className="min-w-0">
@@ -844,17 +894,18 @@ export const FinancialFeriaReport: React.FC = () => {
                             </p>
                         </div>
                         <button
-                            className="text-text-muted hover:text-white transition-colors p-1 text-lg shrink-0"
+                            className="text-text-muted hover:text-white transition-colors p-1 shrink-0"
                             onClick={closeTotalEditor}
                             disabled={isSavingEdit}
                             title="Cerrar"
-                        >✕</button>
+                            aria-label="Cerrar"
+                        ><X size={18} strokeWidth={2.2} /></button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                        <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-3 text-xs text-text-secondary">
-                            <span className="text-accent-blue font-bold">ℹ️</span>{' '}
-                            Estás editando el total agregado. Cada cambio (o producto añadido) se suma al último día del evento, que es el que se ajustará. El stock se recalcula sólo con la diferencia en consumido.
+                        <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-3 text-xs text-text-secondary flex items-start gap-2">
+                            <Info size={14} strokeWidth={2.2} className="text-accent-blue shrink-0 mt-0.5" aria-hidden="true" />
+                            <span>Estás editando el total agregado. Cada cambio (o producto añadido) se suma al último día del evento, que es el que se ajustará. El stock se recalcula sólo con la diferencia en consumido.</span>
                         </div>
 
                         <div className="relative">
@@ -865,12 +916,13 @@ export const FinancialFeriaReport: React.FC = () => {
                                 onChange={e => setEditSearch(e.target.value)}
                                 className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-3 pl-10 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
                             />
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">🔍</span>
+                            <Search size={16} strokeWidth={2.2} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" aria-hidden="true" />
                             {editSearch && (
                                 <button
                                     onClick={() => setEditSearch('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm"
-                                >✕</button>
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white p-0.5"
+                                    aria-label="Limpiar búsqueda"
+                                ><X size={14} strokeWidth={2.2} /></button>
                             )}
                         </div>
 
@@ -924,9 +976,10 @@ export const FinancialFeriaReport: React.FC = () => {
                                                 </div>
                                                 <button
                                                     onClick={() => setEditRows(rows => rows.filter((_, i) => i !== rowIdx))}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent-red/10 border border-accent-red/20 text-accent-red hover:bg-accent-red/20 text-sm"
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent-red/10 border border-accent-red/20 text-accent-red hover:bg-accent-red/20 transition-colors"
                                                     title="Quitar"
-                                                >🗑</button>
+                                                    aria-label="Quitar"
+                                                ><Trash2 size={14} strokeWidth={2.2} /></button>
                                             </div>
                                         </div>
                                     );
@@ -944,12 +997,13 @@ export const FinancialFeriaReport: React.FC = () => {
                                     onChange={e => setCatalogSearch(e.target.value)}
                                     className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-2 pl-9 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
                                 />
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">🔍</span>
+                                <Search size={14} strokeWidth={2.2} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" aria-hidden="true" />
                                 {catalogSearch && (
                                     <button
                                         onClick={() => setCatalogSearch('')}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm px-1"
-                                    >✕</button>
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white px-1"
+                                        aria-label="Limpiar búsqueda"
+                                    ><X size={14} strokeWidth={2.2} /></button>
                                 )}
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2">
@@ -1041,7 +1095,9 @@ export const FinancialFeriaReport: React.FC = () => {
                     {hasChanges && (
                         <div className="px-6 pt-3 pb-2 border-t border-white/5 bg-bg-primary/30">
                             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                                <div className="section-label text-accent-blue">📊 Vista previa al guardar</div>
+                                <div className="section-label text-accent-blue flex items-center gap-1.5">
+                                    <BarChart3 size={12} strokeWidth={2.4} aria-hidden="true" /> Vista previa al guardar
+                                </div>
                                 <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wider">
                                     <span>Δ Consumo: <span className={impact.expenseDelta > 0 ? 'text-accent-red' : impact.expenseDelta < 0 ? 'text-accent-green' : 'text-text-muted'}>
                                         {impact.expenseDelta > 0 ? '+' : ''}{impact.expenseDelta.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €
@@ -1080,7 +1136,9 @@ export const FinancialFeriaReport: React.FC = () => {
                             onClick={handleSaveTotal}
                             disabled={isSavingEdit}
                         >
-                            {isSavingEdit ? '⏳ Guardando...' : '💾 Guardar Total'}
+                            {isSavingEdit
+                                ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Guardando...</>
+                                : <><Save size={16} strokeWidth={2.2} aria-hidden="true" /> Guardar Total</>}
                         </button>
                     </div>
                 </div>
@@ -1089,7 +1147,7 @@ export const FinancialFeriaReport: React.FC = () => {
 
         {/* ─── Edit Historical Log Modal ─── */}
         {editing && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+            <div className="modal-overlay">
                 <div className="bg-bg-elevated border border-white/10 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
                     {/* Header */}
                     <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4">
@@ -1099,18 +1157,19 @@ export const FinancialFeriaReport: React.FC = () => {
                             <p className="text-sm text-text-muted mt-0.5">Día de servicio: <strong className="text-white">{editing.date}</strong></p>
                         </div>
                         <button
-                            className="text-text-muted hover:text-white transition-colors p-1 text-lg shrink-0"
+                            className="text-text-muted hover:text-white transition-colors p-1 shrink-0"
                             onClick={closeEditor}
                             disabled={isSavingEdit}
                             title="Cerrar"
-                        >✕</button>
+                            aria-label="Cerrar"
+                        ><X size={18} strokeWidth={2.2} /></button>
                     </div>
 
                     {/* Body */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                        <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-3 text-xs text-text-secondary">
-                            <span className="text-accent-blue font-bold">ℹ️</span>{' '}
-                            Sólo el consumido afecta al stock en pedidos cerrados. Si cambias el preparado, solo modificas la factura.
+                        <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-3 text-xs text-text-secondary flex items-start gap-2">
+                            <Info size={14} strokeWidth={2.2} className="text-accent-blue shrink-0 mt-0.5" aria-hidden="true" />
+                            <span>Sólo el consumido afecta al stock en pedidos cerrados. Si cambias el preparado, solo modificas la factura.</span>
                         </div>
 
                         {/* Search over existing items */}
@@ -1122,12 +1181,13 @@ export const FinancialFeriaReport: React.FC = () => {
                                 onChange={e => setEditSearch(e.target.value)}
                                 className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-3 pl-10 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
                             />
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">🔍</span>
+                            <Search size={16} strokeWidth={2.2} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" aria-hidden="true" />
                             {editSearch && (
                                 <button
                                     onClick={() => setEditSearch('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm"
-                                >✕</button>
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-white p-0.5"
+                                    aria-label="Limpiar búsqueda"
+                                ><X size={14} strokeWidth={2.2} /></button>
                             )}
                         </div>
 
@@ -1182,9 +1242,10 @@ export const FinancialFeriaReport: React.FC = () => {
                                                 </div>
                                                 <button
                                                     onClick={() => setEditRows(rows => rows.filter((_, i) => i !== rowIdx))}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent-red/10 border border-accent-red/20 text-accent-red hover:bg-accent-red/20 text-sm"
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent-red/10 border border-accent-red/20 text-accent-red hover:bg-accent-red/20 transition-colors"
                                                     title="Quitar"
-                                                >🗑</button>
+                                                    aria-label="Quitar"
+                                                ><Trash2 size={14} strokeWidth={2.2} /></button>
                                             </div>
                                         </div>
                                     );
@@ -1203,12 +1264,13 @@ export const FinancialFeriaReport: React.FC = () => {
                                     onChange={e => setCatalogSearch(e.target.value)}
                                     className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-2 pl-9 text-white outline-none focus:border-accent-blue placeholder:text-text-muted text-sm"
                                 />
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">🔍</span>
+                                <Search size={14} strokeWidth={2.2} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" aria-hidden="true" />
                                 {catalogSearch && (
                                     <button
                                         onClick={() => setCatalogSearch('')}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-sm px-1"
-                                    >✕</button>
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white px-1"
+                                        aria-label="Limpiar búsqueda"
+                                    ><X size={14} strokeWidth={2.2} /></button>
                                 )}
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2">
@@ -1300,7 +1362,9 @@ export const FinancialFeriaReport: React.FC = () => {
                     {hasChanges && (
                         <div className="px-6 pt-3 pb-2 border-t border-white/5 bg-bg-primary/30">
                             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                                <div className="section-label text-accent-blue">📊 Vista previa al guardar</div>
+                                <div className="section-label text-accent-blue flex items-center gap-1.5">
+                                    <BarChart3 size={12} strokeWidth={2.4} aria-hidden="true" /> Vista previa al guardar
+                                </div>
                                 <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wider">
                                     <span>Δ Consumo: <span className={impact.expenseDelta > 0 ? 'text-accent-red' : impact.expenseDelta < 0 ? 'text-accent-green' : 'text-text-muted'}>
                                         {impact.expenseDelta > 0 ? '+' : ''}{impact.expenseDelta.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €
@@ -1340,7 +1404,9 @@ export const FinancialFeriaReport: React.FC = () => {
                             onClick={handleSaveEdit}
                             disabled={isSavingEdit}
                         >
-                            {isSavingEdit ? '⏳ Guardando...' : '💾 Guardar Cambios'}
+                            {isSavingEdit
+                                ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Guardando...</>
+                                : <><Save size={16} strokeWidth={2.2} aria-hidden="true" /> Guardar Cambios</>}
                         </button>
                     </div>
                 </div>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { CalendarDays, ChevronDown, ChevronRight, Lock, Store, TrendingDown, Undo2 } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 
 export const EventAnalytics: React.FC = () => {
@@ -173,14 +174,19 @@ export const EventAnalytics: React.FC = () => {
     const ordersOnly = events.filter(e => e.type === 'ORDER');
     if (ordersOnly.length === 0) {
         return (
-            <div className="card text-center py-10 animate-fade-in">
-                <p className="text-text-muted">Aún no se han registrado Pedidos operacionales en el Punto de Venta para analizar.</p>
+            <div className="card animate-fade-in">
+                <div className="empty-state">
+                    <div className="empty-state-icon">
+                        <CalendarDays size={20} strokeWidth={2} />
+                    </div>
+                    <p className="text-text-muted mb-0">Aún no se han registrado Pedidos operacionales en el Punto de Venta para analizar.</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="animate-fade-in space-y-6">
+        <div className="animate-fade-in">
             <div className="grid gap-6">
                 {eventStats.map((stat, i) => {
                     const isExpanded = expandedEvent === stat.title;
@@ -191,18 +197,20 @@ export const EventAnalytics: React.FC = () => {
                             className={`card relative overflow-hidden transition-all duration-300 cursor-pointer ${isExpanded ? 'border-accent-blue shadow-lg ring-1 ring-accent-blue/50' : 'hover:border-accent-blue/50 group'}`}
                             onClick={() => handleEventExpand(stat.title)}
                         >
-                            <div className="flex justify-between items-start mb-6">
+                            <div className="flex justify-between items-start gap-4 mb-6">
                                 <div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="badge bg-accent-blue/20 text-accent-blue">
-                                            📅 {stat.typeDesc}
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                        <span className="badge badge-blue gap-1.5">
+                                            <CalendarDays size={12} strokeWidth={2.4} />
+                                            {stat.typeDesc}
                                         </span>
                                         <span className="text-xs text-text-muted">{stat.daysCount} días configurados</span>
                                     </div>
                                     <h3 className="text-2xl font-bold line-clamp-2">{stat.title}</h3>
                                     {stat.casetasCount > 0 && (
-                                        <div className="text-sm text-accent-blue/80 font-medium mt-1">
-                                            🏘️ Casetas: {stat.casetasList.join(', ')}
+                                        <div className="flex items-center gap-1.5 text-sm text-accent-blue/80 font-medium mt-1">
+                                            <Store size={14} strokeWidth={2.2} className="shrink-0" />
+                                            <span>Casetas: {stat.casetasList.join(', ')}</span>
                                         </div>
                                     )}
                                     <p className="text-text-muted text-sm mt-1">
@@ -211,9 +219,12 @@ export const EventAnalytics: React.FC = () => {
                                 </div>
 
                                 {stat.itemsCount > 0 && (
-                                    <div className="bg-bg-elevated p-3 rounded-lg border border-accent-blue/20 text-right shrink-0">
-                                        <div className="text-xs text-text-muted uppercase tracking-wider mb-1">Devoluciones</div>
-                                        <div className="text-2xl font-bold text-accent-blue">{stat.totalDevoluciones.toLocaleString('es-ES')} €</div>
+                                    <div className="bg-bg-elevated/60 p-3 rounded-xl border border-accent-blue/20 text-right shrink-0">
+                                        <div className="flex items-center justify-end gap-1.5 text-xs text-text-muted uppercase tracking-wider mb-1">
+                                            <TrendingDown size={14} strokeWidth={2.2} className="text-accent-blue" />
+                                            Devoluciones
+                                        </div>
+                                        <div className="text-2xl font-bold text-accent-blue num">{stat.totalDevoluciones.toLocaleString('es-ES')} €</div>
                                     </div>
                                 )}
                             </div>
@@ -221,19 +232,19 @@ export const EventAnalytics: React.FC = () => {
                             {/* Summary cards — only Costos and Devoluciones */}
                             {stat.itemsCount > 0 && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-white/5 pt-4 text-center">
-                                    <div className="bg-bg-elevated/30 p-3 rounded">
+                                    <div className="bg-bg-elevated/30 p-3 rounded-lg">
                                         <div className="text-xs text-text-muted mb-1">Costo Mercancía Consumida</div>
-                                        <div className="text-lg font-bold text-accent-red">{stat.totalExpenses.toLocaleString('es-ES')} €</div>
+                                        <div className="text-lg font-bold text-accent-red num">{stat.totalExpenses.toLocaleString('es-ES')} €</div>
                                     </div>
-                                    <div className="bg-bg-elevated/30 p-3 rounded">
+                                    <div className="bg-bg-elevated/30 p-3 rounded-lg">
                                         <div className="text-xs text-text-muted mb-1">Total Devoluciones (valor)</div>
-                                        <div className="text-lg font-bold text-accent-blue">{stat.totalDevoluciones.toLocaleString('es-ES')} €</div>
+                                        <div className="text-lg font-bold text-accent-blue num">{stat.totalDevoluciones.toLocaleString('es-ES')} €</div>
                                     </div>
                                 </div>
                             )}
 
                             {stat.itemsCount === 0 && (
-                                <div className="text-center p-4 bg-bg-elevated/30 rounded border-dashed border border-white/10 text-text-muted text-sm mt-4">
+                                <div className="text-center p-4 bg-bg-elevated/30 rounded-lg border-dashed border border-white/10 text-text-muted text-sm mt-4">
                                     No se encontraron jornadas finalizadas para este evento. Asegúrate de cerrar y auditar la jornada diaria en el calendario histórico.
                                 </div>
                             )}
@@ -241,17 +252,20 @@ export const EventAnalytics: React.FC = () => {
                             {/* DAILY BREAKDOWN (expandable) */}
                             {isExpanded && stat.itemsCount > 0 && role === 'MASTER' && (
                                 <div className="mt-6 pt-6 border-t border-white/10 animate-fade-in cursor-default" onClick={e => e.stopPropagation()}>
-                                    <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                        <span>📅 Desglose por Día</span>
+                                    <h4 className="text-lg font-bold mb-4 flex items-center gap-3">
+                                        <span className="icon-chip icon-chip-blue">
+                                            <CalendarDays size={16} strokeWidth={2.2} />
+                                        </span>
+                                        <span>Desglose por Día</span>
                                     </h4>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm border-separate border-spacing-y-2">
+                                    <div className="table-wrap">
+                                        <table className="data-table">
                                             <thead>
-                                                <tr className="text-text-muted uppercase tracking-wider text-xs">
-                                                    <th className="px-4 py-2">Fecha / Caseta / Producto</th>
-                                                    <th className="px-4 py-2 text-right">Utilizado</th>
-                                                    <th className="px-4 py-2 text-right">Sobrante</th>
-                                                    <th className="px-4 py-2 text-right">Monto (€)</th>
+                                                <tr>
+                                                    <th>Fecha / Caseta / Producto</th>
+                                                    <th className="text-right">Utilizado</th>
+                                                    <th className="text-right">Sobrante</th>
+                                                    <th className="text-right">Monto (€)</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -260,22 +274,22 @@ export const EventAnalytics: React.FC = () => {
                                                     
                                                     return (
                                                         <React.Fragment key={day.date}>
-                                                            <tr 
-                                                                className={`transition-colors cursor-pointer rounded-lg overflow-hidden ${isDayExpanded ? 'bg-accent-blue/10' : 'hover:bg-white/5 bg-white/[0.02]'}`}
+                                                            <tr
+                                                                className={`cursor-pointer ${isDayExpanded ? 'bg-accent-blue/10' : ''}`}
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handleDateExpand(stat.title, day.date);
                                                                 }}
                                                             >
-                                                                <td className="px-4 py-3 font-bold text-accent-blue">
+                                                                <td className="font-bold text-accent-blue">
                                                                     <div className="flex items-center gap-2">
-                                                                        <span>{isDayExpanded ? '▼' : '▶'}</span>
+                                                                        {isDayExpanded ? <ChevronDown size={14} strokeWidth={2.4} /> : <ChevronRight size={14} strokeWidth={2.4} />}
                                                                         {day.date}
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-4 py-3 text-right text-text-muted italic">Ver casetas</td>
-                                                                <td className="px-4 py-3 text-right text-accent-blue font-bold">{day.devoluciones > 0 ? day.devoluciones.toLocaleString('es-ES') + ' €' : '-'}</td>
-                                                                <td className="px-4 py-3 text-right font-bold">{day.gastos.toLocaleString('es-ES')} €</td>
+                                                                <td className="text-right text-text-muted italic">Ver casetas</td>
+                                                                <td className="text-right text-accent-blue font-bold num">{day.devoluciones > 0 ? day.devoluciones.toLocaleString('es-ES') + ' €' : '-'}</td>
+                                                                <td className="text-right font-bold num">{day.gastos.toLocaleString('es-ES')} €</td>
                                                             </tr>
                                                             {isDayExpanded && day.casetas.map(caseta => {
                                                                 const casetaId = `${stat.title}-${day.date}-${caseta.name}`;
@@ -284,8 +298,8 @@ export const EventAnalytics: React.FC = () => {
                                                                 
                                                                 return (
                                                                     <React.Fragment key={caseta.name}>
-                                                                        <tr 
-                                                                            className={`animate-fade-in transition-colors cursor-pointer ${isCasetaExpanded ? 'bg-white/10' : 'bg-black/20 hover:bg-white/5'}`}
+                                                                        <tr
+                                                                            className={`animate-fade-in cursor-pointer ${isCasetaExpanded ? 'bg-white/10' : 'bg-black/20'}`}
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 if (hasItems) setExpandedCaseta(isCasetaExpanded ? null : casetaId);
@@ -293,20 +307,21 @@ export const EventAnalytics: React.FC = () => {
                                                                         >
                                                                             <td className="px-8 py-2 text-text-muted font-medium">
                                                                                 <div className="flex items-center gap-2">
-                                                                                    {hasItems && <span>{isCasetaExpanded ? '▼' : '▶'}</span>}
-                                                                                    🏘️ {caseta.name}
+                                                                                    {hasItems && (isCasetaExpanded ? <ChevronDown size={13} strokeWidth={2.4} /> : <ChevronRight size={13} strokeWidth={2.4} />)}
+                                                                                    <Store size={13} strokeWidth={2.2} className="shrink-0" />
+                                                                                    {caseta.name}
                                                                                 </div>
                                                                             </td>
-                                                                            <td className="px-4 py-2 text-right text-xs text-text-muted">{hasItems ? 'Ver productos' : 'Sin detalles'}</td>
-                                                                            <td className="px-4 py-2 text-right text-accent-blue/70 text-xs">{caseta.devoluciones > 0 ? caseta.devoluciones.toLocaleString('es-ES') + ' €' : '-'}</td>
-                                                                            <td className="px-4 py-2 text-right text-text-muted text-xs">{caseta.gastos.toLocaleString('es-ES')} €</td>
+                                                                            <td className="py-2 text-right text-xs text-text-muted">{hasItems ? 'Ver productos' : 'Sin detalles'}</td>
+                                                                            <td className="py-2 text-right text-accent-blue/70 text-xs num">{caseta.devoluciones > 0 ? caseta.devoluciones.toLocaleString('es-ES') + ' €' : '-'}</td>
+                                                                            <td className="py-2 text-right text-text-muted text-xs num">{caseta.gastos.toLocaleString('es-ES')} €</td>
                                                                         </tr>
                                                                         {isCasetaExpanded && caseta.items.map((item, idx) => (
-                                                                            <tr key={idx} className="animate-fade-in bg-white/[0.01] text-[11px] border-b border-white/[0.02]">
+                                                                            <tr key={idx} className="animate-fade-in bg-white/[0.01] text-[11px]">
                                                                                 <td className="px-12 py-1.5 text-text-muted/80">{item.name}</td>
-                                                                                <td className="px-4 py-1.5 text-right">{item.consumed > 0 ? item.consumed : '-'}</td>
-                                                                                <td className="px-4 py-1.5 text-right text-accent-blue/50">{item.leftover > 0 ? item.leftover : '-'}</td>
-                                                                                <td className="px-4 py-1.5 text-right text-text-muted/50">{(item.consumed * item.price).toLocaleString('es-ES')} €</td>
+                                                                                <td className="py-1.5 text-right num">{item.consumed > 0 ? item.consumed : '-'}</td>
+                                                                                <td className="py-1.5 text-right text-accent-blue/50 num">{item.leftover > 0 ? item.leftover : '-'}</td>
+                                                                                <td className="py-1.5 text-right text-text-muted/50 num">{(item.consumed * item.price).toLocaleString('es-ES')} €</td>
                                                                             </tr>
                                                                         ))}
                                                                     </React.Fragment>
@@ -324,9 +339,9 @@ export const EventAnalytics: React.FC = () => {
                                             {stat.dailyBreakdown.length > 0 && (
                                                 <tfoot>
                                                     <tr className="font-bold bg-bg-elevated/30">
-                                                        <td className="px-4 py-3 rounded-l-lg border-t border-white/5">TOTALES ({stat.dailyBreakdown.length} días)</td>
-                                                        <td className="px-4 py-3 text-right border-t border-white/5" colSpan={2}>Devoluciones: {stat.totalDevoluciones.toLocaleString('es-ES')} €</td>
-                                                        <td className="px-4 py-3 text-right rounded-r-lg border-t border-white/5">Costo: {stat.totalExpenses.toLocaleString('es-ES')} €</td>
+                                                        <td className="px-4 py-3 border-t border-white/5">TOTALES ({stat.dailyBreakdown.length} días)</td>
+                                                        <td className="px-4 py-3 text-right border-t border-white/5" colSpan={2}>Devoluciones: <span className="num">{stat.totalDevoluciones.toLocaleString('es-ES')} €</span></td>
+                                                        <td className="px-4 py-3 text-right border-t border-white/5">Costo: <span className="num">{stat.totalExpenses.toLocaleString('es-ES')} €</span></td>
                                                     </tr>
                                                 </tfoot>
                                             )}
@@ -335,25 +350,34 @@ export const EventAnalytics: React.FC = () => {
 
                                     {/* GLOBAL CASETA SUMMARY */}
                                     <div className="mt-10 pt-6 border-t border-white/10 animate-fade-in">
-                                        <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                            <span>🏘️ Devolución Total por Caseta</span>
-                                            <span className="text-[10px] bg-accent-blue/20 text-accent-blue px-2 py-0.5 rounded uppercase tracking-widest">Resumen Feria</span>
+                                        <h4 className="text-lg font-bold mb-4 flex items-center gap-3 flex-wrap">
+                                            <span className="icon-chip icon-chip-blue">
+                                                <Store size={16} strokeWidth={2.2} />
+                                            </span>
+                                            <span>Devolución Total por Caseta</span>
+                                            <span className="badge badge-blue">Resumen Feria</span>
                                         </h4>
                                         <div className="grid gap-4">
                                             {stat.casetaBreakdown.map((caseta, idx) => (
                                                 <div key={idx} className="bg-bg-elevated/20 border border-white/5 rounded-xl p-4">
-                                                    <div className="flex justify-between items-center mb-3">
-                                                        <h5 className="font-bold text-accent-blue"> Caseta: {caseta.name}</h5>
+                                                    <div className="flex justify-between items-center gap-4 mb-3">
+                                                        <h5 className="font-bold text-accent-blue mb-0 flex items-center gap-1.5">
+                                                            <Store size={14} strokeWidth={2.2} className="shrink-0" />
+                                                            Caseta: {caseta.name}
+                                                        </h5>
                                                         <div className="text-right">
                                                             <div className="text-xs text-text-muted italic">Total Devolución</div>
-                                                            <div className="font-bold">{caseta.devoluciones.toLocaleString('es-ES')} €</div>
+                                                            <div className="font-bold num">{caseta.devoluciones.toLocaleString('es-ES')} €</div>
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                                         {caseta.items.filter(it => it.leftover > 0).map((item, iidx) => (
-                                                            <div key={iidx} className="bg-black/20 p-2 rounded border border-white/5 flex justify-between items-center text-xs">
+                                                            <div key={iidx} className="bg-black/20 p-2 rounded-lg border border-white/5 flex justify-between items-center gap-2 text-xs">
                                                                 <span className="text-white/70">{item.name}</span>
-                                                                <span className="font-bold text-accent-blue">🔙 {item.leftover} uds</span>
+                                                                <span className="font-bold text-accent-blue inline-flex items-center gap-1 shrink-0">
+                                                                    <Undo2 size={12} strokeWidth={2.4} />
+                                                                    {item.leftover} uds
+                                                                </span>
                                                             </div>
                                                         ))}
                                                         {caseta.items.filter(it => it.leftover > 0).length === 0 && (
@@ -370,8 +394,9 @@ export const EventAnalytics: React.FC = () => {
                             )}
 
                             {isExpanded && stat.itemsCount > 0 && role !== 'MASTER' && (
-                                <div className="mt-6 pt-6 border-t border-white/10 animate-fade-in text-center text-text-muted text-sm cursor-default" onClick={e => e.stopPropagation()}>
-                                    🔒 El desglose de productos por feria está reservado para Administradores.
+                                <div className="mt-6 pt-6 border-t border-white/10 animate-fade-in flex items-center justify-center gap-2 text-center text-text-muted text-sm cursor-default" onClick={e => e.stopPropagation()}>
+                                    <Lock size={14} strokeWidth={2.2} className="shrink-0" />
+                                    El desglose de productos por feria está reservado para Administradores.
                                 </div>
                             )}
                         </div>

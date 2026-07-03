@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 
@@ -48,12 +49,13 @@ export const RoleSelect: React.FC = () => {
             {/* ─── LEFT: Branded hero ─── */}
             <div className="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden">
                 {/* Ambient gradient layers */}
-                <div className="absolute inset-0 bg-gradient-to-br from-accent-blue/20 via-transparent to-accent-green/10" />
-                <div className="absolute -top-32 -left-32 w-96 h-96 bg-accent-blue/20 rounded-full blur-3xl" />
-                <div className="absolute -bottom-32 -right-20 w-[28rem] h-[28rem] bg-accent-green/10 rounded-full blur-3xl" />
+                <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-accent-blue/20 via-transparent to-accent-green/10" />
+                <div aria-hidden="true" className="absolute -top-32 -left-32 w-96 h-96 bg-accent-blue/20 rounded-full blur-3xl" />
+                <div aria-hidden="true" className="absolute -bottom-32 -right-20 w-[28rem] h-[28rem] bg-accent-green/10 rounded-full blur-3xl" />
 
                 {/* Grid pattern overlay */}
                 <div
+                    aria-hidden="true"
                     className="absolute inset-0 opacity-[0.04]"
                     style={{
                         backgroundImage: 'linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)',
@@ -167,13 +169,13 @@ export const RoleSelect: React.FC = () => {
                         >
                             {isLoading ? (
                                 <>
-                                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <Loader2 size={16} className="animate-spin" />
                                     Verificando...
                                 </>
                             ) : (
                                 <>
                                     Entrar al sistema
-                                    <span className="text-lg -mr-1">→</span>
+                                    <ArrowRight size={18} strokeWidth={2.2} className="-mr-1" />
                                 </>
                             )}
                         </button>

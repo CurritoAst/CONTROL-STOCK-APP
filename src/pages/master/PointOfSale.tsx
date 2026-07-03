@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { EventType, InventoryItem } from '../../types';
+import {
+    CalendarCheck, CalendarDays, CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
+    Loader2, Minus, Package, Pencil, Plus, Receipt, Save, Store, Trash2, Undo2
+} from 'lucide-react';
 
 // Helper to get days in month
 function getDaysInMonth(year: number, month: number) {
@@ -312,32 +316,38 @@ export const PointOfSale: React.FC = () => {
 
         if (!log) {
             return (
-                <div className="mt-4 p-4 bg-black/20 rounded-md border border-white/5 text-center text-text-muted text-sm">
-                    No se ha iniciado un pedido para este evento aún. (El empleado debe hacerlo desde su panel).
+                <div className="mt-4 bg-black/20 rounded-xl border border-white/5">
+                    <div className="empty-state py-8">
+                        <div className="empty-state-icon"><Receipt size={20} strokeWidth={2} /></div>
+                        <p className="text-sm">No se ha iniciado un pedido para este evento aún. (El empleado debe hacerlo desde su panel).</p>
+                    </div>
                 </div>
             );
         }
 
         if (isEditingOrder) {
             return (
-                <div className="mt-4 p-4 bg-black/20 rounded-md border border-accent-blue/30 animate-fade-in">
-                    <h4 className="font-bold mb-3 text-accent-blue border-b border-white/10 pb-2">Editando Cantidades del Pedido</h4>
-                    <div className="space-y-3 max-h-80 overflow-y-auto pr-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="mt-4 p-4 bg-black/20 rounded-xl border border-accent-blue/30 animate-fade-in">
+                    <h4 className="font-bold mb-3 text-accent-blue border-b border-white/10 pb-2 flex items-center gap-2">
+                        <Pencil size={15} strokeWidth={2.2} />
+                        Editando Cantidades del Pedido
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-2">
                         {editingItems.map(item => (
-                            <div key={item.product.id} className="flex flex-col bg-bg-elevated p-3 rounded border border-white/5">
+                            <div key={item.product.id} className="flex flex-col bg-bg-elevated p-3 rounded-lg border border-white/5">
                                 <span className="text-sm font-medium mb-2 truncate" title={item.product.name}>{item.product.name}</span>
                                 <div className="flex justify-between items-center mt-auto">
-                                    <button className="btn btn-outline px-3 py-1 text-lg hover:bg-white/10" onClick={() => handleUpdateQuantity(item.product.id, item.prepared - 1)}>-</button>
-                                    <span className="text-lg font-bold w-12 text-center text-accent-blue">{item.prepared}</span>
-                                    <button className="btn btn-outline px-3 py-1 text-lg hover:bg-white/10" onClick={() => handleUpdateQuantity(item.product.id, item.prepared + 1)}>+</button>
+                                    <button className="btn btn-outline px-3 py-2" aria-label={`Restar uno a ${item.product.name}`} onClick={() => handleUpdateQuantity(item.product.id, item.prepared - 1)}><Minus size={16} strokeWidth={2.4} /></button>
+                                    <span className="text-lg font-bold w-12 text-center text-accent-blue num">{item.prepared}</span>
+                                    <button className="btn btn-outline px-3 py-2" aria-label={`Sumar uno a ${item.product.name}`} onClick={() => handleUpdateQuantity(item.product.id, item.prepared + 1)}><Plus size={16} strokeWidth={2.4} /></button>
                                 </div>
                             </div>
                         ))}
                     </div>
                     <div className="flex gap-4 mt-6 pt-4 border-t border-white/10">
                         <button className="btn btn-outline flex-1" onClick={() => setIsEditingOrder(false)} disabled={isSaving}>Cancelar</button>
-                        <button className="btn btn-primary flex-1 shadow-lg shadow-accent-blue/20 flex items-center justify-center gap-2" onClick={() => saveOrderChanges(evt)} disabled={isSaving}>
-                            {isSaving ? <span className="animate-spin text-lg">⏳</span> : null}
+                        <button className="btn btn-primary flex-1" onClick={() => saveOrderChanges(evt)} disabled={isSaving}>
+                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} strokeWidth={2.2} />}
                             {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                         </button>
                     </div>
@@ -346,10 +356,10 @@ export const PointOfSale: React.FC = () => {
         }
 
         return (
-            <div className="mt-4 p-4 bg-black/20 rounded-md border border-white/5 animate-fade-in">
+            <div className="mt-4 p-4 bg-black/20 rounded-xl border border-white/5 animate-fade-in">
                 <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
-                    <h4 className="font-bold text-sm text-text-muted">Desglose del Pedido</h4>
-                    <span className="badge bg-white/10 text-xs text-center border border-white/20 px-2 py-1 rounded">
+                    <h4 className="section-label flex items-center gap-2"><Receipt size={14} strokeWidth={2.2} /> Desglose del Pedido</h4>
+                    <span className="badge badge-gray">
                         {log.status === 'PENDING_PEDIDO' ? 'Pendiente' :
                             log.status === 'OPEN' ? 'En cruso' :
                                 log.status === 'CLOSED' ? 'Día Cerrado' :
@@ -358,22 +368,23 @@ export const PointOfSale: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-4">
                     {log.items.map((item: InventoryItem) => (
-                        <div key={item.product.id} className="bg-bg-elevated p-2 rounded text-center border border-white/5">
+                        <div key={item.product.id} className="bg-bg-elevated p-2 rounded-lg text-center border border-white/5">
                             <div className="text-xs text-text-muted truncate" title={item.product.name}>{item.product.name}</div>
-                            <div className="font-bold text-accent-blue">{item.prepared}</div>
+                            <div className="font-bold text-accent-blue num">{item.prepared}</div>
                         </div>
                     ))}
                     {log.items.length === 0 && (
-                        <div className="col-span-full text-center text-sm text-text-muted py-2 bg-black/20 rounded-md">Sin productos solicitados.</div>
+                        <div className="col-span-full text-center text-sm text-text-muted py-2 bg-black/20 rounded-lg">Sin productos solicitados.</div>
                     )}
                 </div>
 
                 <div className="flex justify-end mt-2">
                     <button
-                        className="btn btn-outline border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10 text-sm py-1"
+                        className="btn btn-outline btn-sm border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10"
                         onClick={() => startEditingOrder(evt)}
                     >
-                        ✏️ Editar Formato Real
+                        <Pencil size={14} strokeWidth={2.2} />
+                        Editar Formato Real
                     </button>
                 </div>
             </div>
@@ -399,7 +410,7 @@ export const PointOfSale: React.FC = () => {
                         setSelectedDate(dateStr);
                         setNewEvent({ ...newEvent, date: dateStr });
                     }}
-                    className={`p-2 min-h-[80px] border border-white/5 rounded-md flex flex-col items-start justify-start transition-all relative ${isSelected ? 'bg-accent-blue/20 border-accent-blue shadow-lg' : 'bg-bg-elevated/30 hover:bg-bg-elevated cursor-pointer'
+                    className={`p-2 min-h-[80px] border border-white/5 rounded-lg flex flex-col items-start justify-start transition-all relative ${isSelected ? 'bg-accent-blue/20 border-accent-blue shadow-lg' : 'bg-bg-elevated/30 hover:bg-bg-elevated cursor-pointer'
                         }`}
                 >
                     <span className="text-sm font-bold mb-1 opacity-80">{day}</span>
@@ -426,27 +437,31 @@ export const PointOfSale: React.FC = () => {
 
     return (
         <div className="animate-fade-in w-full space-y-6">
-            <div className="card">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <div className="page-header">
+                <div className="flex items-start gap-3">
+                    <span className="icon-chip icon-chip-blue mt-1"><Store size={18} strokeWidth={2.2} /></span>
                     <div>
-                        <h2 className="text-2xl mb-1">🏪 Punto de Venta y Calendario</h2>
-                        <p className="text-text-muted">Planifica ferias, eventos especiales y previsión de pedidos.</p>
+                        <h1 className="page-title">Punto de Venta y Calendario</h1>
+                        <p className="page-subtitle">Planifica ferias, eventos especiales y previsión de pedidos.</p>
                     </div>
-                    <button className="btn btn-primary" onClick={() => {
-                        setNewEvent({ ...newEvent, type: 'EVENT', date: selectedDate || `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}` })
-                        setIsAddingEvent(true);
-                    }}>
-                        + Nuevo Evento/Pedido
-                    </button>
+                </div>
+                <button className="btn btn-primary" onClick={() => {
+                    setNewEvent({ ...newEvent, type: 'EVENT', date: selectedDate || `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}` })
+                    setIsAddingEvent(true);
+                }}>
+                    <CalendarPlus size={16} strokeWidth={2.2} />
+                    Nuevo Evento/Pedido
+                </button>
+            </div>
+
+            <div className="card">
+                <div className="flex justify-between items-center mb-4 bg-bg-elevated/30 border border-white/5 p-2 rounded-xl">
+                    <button className="btn btn-outline btn-sm" onClick={prevMonth} aria-label="Mes anterior"><ChevronLeft size={16} strokeWidth={2.2} /> Ant</button>
+                    <h3 className="text-lg md:text-xl font-bold">{monthNames[month]} {year}</h3>
+                    <button className="btn btn-outline btn-sm" onClick={nextMonth} aria-label="Mes siguiente">Sig <ChevronRight size={16} strokeWidth={2.2} /></button>
                 </div>
 
-                <div className="flex justify-between items-center mb-4 bg-bg-elevated/30 p-2 rounded-md">
-                    <button className="btn btn-outline px-4 py-2" onClick={prevMonth}>&larr; Ant</button>
-                    <h3 className="text-xl font-bold">{monthNames[month]} {year}</h3>
-                    <button className="btn btn-outline px-4 py-2" onClick={nextMonth}>Sig &rarr;</button>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2 text-center text-text-muted font-bold text-sm uppercase">
+                <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2 text-center text-[10px] font-bold uppercase tracking-[0.15em] text-text-muted">
                     <div>Lun</div>
                     <div>Mar</div>
                     <div>Mié</div>
@@ -463,12 +478,16 @@ export const PointOfSale: React.FC = () => {
 
             {selectedDate && (
                 <div className="card animate-fade-in border-t-4 border-t-accent-blue">
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <span className="icon-chip icon-chip-blue"><CalendarCheck size={18} strokeWidth={2.2} /></span>
                         <h3 className="text-xl font-bold">Agenda para el día: {selectedDate}</h3>
                     </div>
 
                     {selectedDayEvents.length === 0 ? (
-                        <p className="text-text-muted text-center py-8 bg-black/20 rounded-lg">No hay eventos o pedidos programados para este día.</p>
+                        <div className="empty-state bg-black/20 rounded-xl">
+                            <div className="empty-state-icon"><CalendarDays size={22} strokeWidth={2} /></div>
+                            <p className="text-sm">No hay eventos o pedidos programados para este día.</p>
+                        </div>
                     ) : (
                         <div className="grid gap-3">
                             {(() => {
@@ -485,21 +504,24 @@ export const PointOfSale: React.FC = () => {
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer hover:bg-white/5 p-2 -mx-2 rounded transition-colors" onClick={() => handleExpandEvent(evt)}>
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span className={`badge ${evt.type === 'EVENT' ? 'bg-accent-blue/20 text-accent-blue' : 'bg-accent-green/20 text-accent-green'}`}>
-                                                            {evt.type === 'EVENT' ? '📅 Evento (Feria/Fiesta)' : '📦 Previsión Pedido'}
+                                                        <span className={`badge gap-1.5 ${evt.type === 'EVENT' ? 'badge-blue' : 'badge-green'}`}>
+                                                            {evt.type === 'EVENT' ? <CalendarDays size={11} strokeWidth={2.4} /> : <Package size={11} strokeWidth={2.4} />}
+                                                            {evt.type === 'EVENT' ? 'Evento (Feria/Fiesta)' : 'Previsión Pedido'}
                                                         </span>
                                                         <span className="font-bold text-lg">{evt.title}</span>
                                                     </div>
                                                     {evt.description && <p className="text-text-muted text-sm mt-2">{evt.description}</p>}
                                                 </div>
                                                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                                                    <span className="text-text-muted text-sm shrink-0">
-                                                        {expandedEventId === evt.id ? '↑ Ocultar' : '↓ Ver Detalles'}
+                                                    <span className="text-text-muted text-sm shrink-0 inline-flex items-center gap-1">
+                                                        {expandedEventId === evt.id ? <ChevronUp size={14} strokeWidth={2.2} /> : <ChevronDown size={14} strokeWidth={2.2} />}
+                                                        {expandedEventId === evt.id ? 'Ocultar' : 'Ver Detalles'}
                                                     </span>
                                                     <button
-                                                        className="btn btn-outline text-accent-red border-accent-red/30 hover:bg-accent-red/20 shrink-0 ml-auto sm:ml-2"
+                                                        className="btn btn-outline btn-sm text-accent-red border-accent-red/30 hover:bg-accent-red/20 shrink-0 ml-auto sm:ml-2"
                                                         onClick={(e) => { e.stopPropagation(); handleDeleteEvent(evt); }}
                                                     >
+                                                        <Trash2 size={14} strokeWidth={2.2} />
                                                         Eliminar
                                                     </button>
                                                 </div>
@@ -508,25 +530,25 @@ export const PointOfSale: React.FC = () => {
                                             {showEditor && (
                                                 <div className="border-t border-white/10 pt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                                     <div className="text-sm text-text-muted flex items-center gap-2 flex-wrap">
-                                                        <span>📅 {group.dates[0] === group.dates[group.dates.length - 1] ? group.dates[0] : `${group.dates[0]} → ${group.dates[group.dates.length - 1]}`}</span>
+                                                        <span className="inline-flex items-center gap-1.5"><CalendarDays size={14} strokeWidth={2.2} /> {group.dates[0] === group.dates[group.dates.length - 1] ? group.dates[0] : `${group.dates[0]} → ${group.dates[group.dates.length - 1]}`}</span>
                                                         <span className="badge badge-blue">{group.dates.length} {group.dates.length === 1 ? 'día' : 'días'}</span>
                                                     </div>
                                                     {isEditingDays ? (
                                                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap">
                                                             <div className="flex items-center gap-2">
-                                                                <label className="text-xs text-text-muted whitespace-nowrap">Desde</label>
+                                                                <label className="text-xs text-text-muted whitespace-nowrap mb-0 ml-0">Desde</label>
                                                                 <input
                                                                     type="date"
-                                                                    className="bg-black/30 border border-white/20 rounded p-1.5 text-white text-sm outline-none focus:border-accent-blue"
+                                                                    className="w-auto px-3 py-2 text-sm"
                                                                     value={editFeriaStart}
                                                                     onChange={e => setEditFeriaStart(e.target.value)}
                                                                 />
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                <label className="text-xs text-text-muted whitespace-nowrap">Hasta</label>
+                                                                <label className="text-xs text-text-muted whitespace-nowrap mb-0 ml-0">Hasta</label>
                                                                 <input
                                                                     type="date"
-                                                                    className="bg-black/30 border border-white/20 rounded p-1.5 text-white text-sm outline-none focus:border-accent-blue"
+                                                                    className="w-auto px-3 py-2 text-sm"
                                                                     value={editFeriaEnd}
                                                                     min={editFeriaStart}
                                                                     onChange={e => setEditFeriaEnd(e.target.value)}
@@ -534,14 +556,14 @@ export const PointOfSale: React.FC = () => {
                                                             </div>
                                                             <div className="flex gap-2">
                                                                 <button
-                                                                    className="btn btn-primary text-sm py-1 px-3 disabled:opacity-40"
+                                                                    className="btn btn-primary btn-sm"
                                                                     onClick={() => handleSaveFeriaDates(feriaName)}
                                                                     disabled={isSaving || !editFeriaStart || !editFeriaEnd}
                                                                 >
-                                                                    {isSaving ? '⏳' : '✓ Guardar'}
+                                                                    {isSaving ? <Loader2 size={14} className="animate-spin" /> : <><Save size={14} strokeWidth={2.2} /> Guardar</>}
                                                                 </button>
                                                                 <button
-                                                                    className="btn btn-outline text-sm py-1 px-3"
+                                                                    className="btn btn-outline btn-sm"
                                                                     onClick={() => setEditingFeriaName(null)}
                                                                     disabled={isSaving}
                                                                 >
@@ -551,10 +573,11 @@ export const PointOfSale: React.FC = () => {
                                                         </div>
                                                     ) : (
                                                         <button
-                                                            className="btn btn-outline text-sm py-1 px-3"
+                                                            className="btn btn-outline btn-sm"
                                                             onClick={() => openEditFeria(feriaName)}
                                                         >
-                                                            ✏️ Editar días
+                                                            <Pencil size={14} strokeWidth={2.2} />
+                                                            Editar días
                                                         </button>
                                                     )}
                                                 </div>
@@ -571,9 +594,12 @@ export const PointOfSale: React.FC = () => {
             )}
 
             {isAddingEvent && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-bg-primary p-6 rounded-lg border border-white/10 max-w-md w-full shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4">Añadir al calendario</h3>
+                <div className="modal-overlay">
+                    <div className="modal-panel max-w-md">
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="icon-chip icon-chip-blue"><CalendarPlus size={18} strokeWidth={2.2} /></span>
+                            <h3 className="text-xl font-bold">Añadir al calendario</h3>
+                        </div>
 
                         <div className="space-y-4 mb-6">
                             <div className="input-group">
@@ -584,16 +610,16 @@ export const PointOfSale: React.FC = () => {
                                         className={`py-3 px-2 rounded-lg border transition-all flex flex-col items-center gap-2 ${newEvent.type === 'EVENT' ? 'bg-accent-blue/20 border-accent-blue text-white ring-1 ring-accent-blue' : 'bg-black/20 border-white/10 text-text-muted hover:border-white/30'}`}
                                         onClick={() => setNewEvent({ ...newEvent, type: 'EVENT' })}
                                     >
-                                        <span className="text-xl">📅</span>
-                                        <span className="text-xs font-bold uppercase tracking-wider">Evento / Feria</span>
+                                        <CalendarDays size={20} strokeWidth={2.2} />
+                                        <span className="text-xs font-semibold">Evento / Feria</span>
                                     </button>
                                     <button
                                         type="button"
                                         className={`py-3 px-2 rounded-lg border transition-all flex flex-col items-center gap-2 ${newEvent.type === 'ORDER' ? 'bg-accent-green/20 border-accent-green text-white ring-1 ring-accent-green' : 'bg-black/20 border-white/10 text-text-muted hover:border-white/30'}`}
                                         onClick={() => setNewEvent({ ...newEvent, type: 'ORDER' })}
                                     >
-                                        <span className="text-xl">🏕️</span>
-                                        <span className="text-xs font-bold uppercase tracking-wider text-center">Crear Pedido y Caseta</span>
+                                        <Store size={20} strokeWidth={2.2} />
+                                        <span className="text-xs font-semibold text-center">Crear Pedido y Caseta</span>
                                     </button>
                                 </div>
                             </div>
@@ -603,7 +629,6 @@ export const PointOfSale: React.FC = () => {
                                     <label>Desde el día</label>
                                     <input
                                         type="date"
-                                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none"
                                         value={newEvent.date || ''}
                                         onChange={e => setNewEvent({ ...newEvent, date: e.target.value })}
                                     />
@@ -612,7 +637,6 @@ export const PointOfSale: React.FC = () => {
                                     <label>Hasta el día (Opcional)</label>
                                     <input
                                         type="date"
-                                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none"
                                         value={newEvent.endDate || ''}
                                         min={newEvent.date}
                                         onChange={e => setNewEvent({ ...newEvent, endDate: e.target.value })}
@@ -626,7 +650,6 @@ export const PointOfSale: React.FC = () => {
                                     <input
                                         type="text"
                                         list="ferias-list"
-                                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none"
                                         value={newEvent.title || ''}
                                         onChange={e => {
                                             setNewEvent({ ...newEvent, title: e.target.value, caseta: '' });
@@ -647,7 +670,6 @@ export const PointOfSale: React.FC = () => {
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex gap-2">
                                                     <select
-                                                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none"
                                                         value={newEvent.caseta || ''}
                                                         onChange={e => setNewEvent({ ...newEvent, caseta: e.target.value })}
                                                     >
@@ -660,8 +682,9 @@ export const PointOfSale: React.FC = () => {
                                                         className="btn btn-outline px-3 transition-colors hover:text-white"
                                                         onClick={() => { setIsAddingNewCaseta(true); setNewEvent({ ...newEvent, caseta: '' }); }}
                                                         title="Añadir Nuevo Pedido / Caseta a esta Feria"
+                                                        aria-label="Añadir Nuevo Pedido / Caseta a esta Feria"
                                                     >
-                                                        +
+                                                        <Plus size={16} strokeWidth={2.4} />
                                                     </button>
                                                 </div>
                                                 <p className="text-[10px] text-text-muted mt-1">Casetas exclusivas vinculadas a esta Feria.</p>
@@ -671,7 +694,7 @@ export const PointOfSale: React.FC = () => {
                                                 <div className="flex gap-2">
                                                     <input
                                                         type="text"
-                                                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none border-dashed border-accent-blue/50"
+                                                        className="border-dashed border-accent-blue/50"
                                                         value={newEvent.caseta || ''}
                                                         onChange={e => setNewEvent({ ...newEvent, caseta: e.target.value })}
                                                         placeholder="Ej. La Viga"
@@ -681,8 +704,9 @@ export const PointOfSale: React.FC = () => {
                                                             className="btn btn-outline px-3 transition-colors hover:text-white"
                                                             onClick={() => { setIsAddingNewCaseta(false); setNewEvent({ ...newEvent, caseta: '' }); }}
                                                             title="Volver a seleccionar caseta existente"
+                                                            aria-label="Volver a seleccionar caseta existente"
                                                         >
-                                                            ↺
+                                                            <Undo2 size={16} strokeWidth={2.2} />
                                                         </button>
                                                     )}
                                                 </div>
@@ -698,7 +722,7 @@ export const PointOfSale: React.FC = () => {
                             <div className="input-group">
                                 <label>Descripción / Notas (Opcional)</label>
                                 <textarea
-                                    className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none min-h-[80px]"
+                                    className="min-h-[80px]"
                                     value={newEvent.description || ''}
                                     onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
                                     placeholder="Detalles sobre lo que se necesita preparar..."
@@ -708,8 +732,8 @@ export const PointOfSale: React.FC = () => {
 
                         <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end">
                             <button className="btn btn-outline w-full sm:w-auto" onClick={() => setIsAddingEvent(false)} disabled={isSaving}>Cancelar</button>
-                            <button className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2" onClick={handleSaveEvent} disabled={!newEvent.title || !newEvent.date || isSaving}>
-                                {isSaving ? <span className="animate-spin text-lg">⏳</span> : null}
+                            <button className="btn btn-primary w-full sm:w-auto" onClick={handleSaveEvent} disabled={!newEvent.title || !newEvent.date || isSaving}>
+                                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} strokeWidth={2.2} />}
                                 {isSaving ? 'Guardando...' : 'Guardar'}
                             </button>
                         </div>

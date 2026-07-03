@@ -9,6 +9,28 @@ import { EmployeeDashboard } from '../employee/EmployeeDashboard';
 import { BackupsPanel } from './BackupsPanel';
 import { useAppContext } from '../../context/AppContext';
 import { supabase, fetchAll } from '../../lib/supabaseClient';
+import {
+    BarChart3,
+    TrendingDown,
+    CalendarDays,
+    ClipboardList,
+    Beef,
+    Store,
+    FolderKanban,
+    DatabaseBackup,
+    AlertTriangle,
+    Send,
+    CheckCircle2,
+    Bell,
+    BellRing,
+    Euro,
+    Package,
+    PackageOpen,
+    ArrowRight,
+    Trash2,
+    Download,
+    Loader2,
+} from 'lucide-react';
 
 export const MasterDashboard: React.FC<{
     activeTab: 'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE' | 'BACKUPS';
@@ -67,28 +89,32 @@ export const MasterDashboard: React.FC<{
             {/* Desktop Tabs (hide on mobile since they are in BottomNav) */}
             <div className="hidden md:flex gap-4 mb-8 overflow-x-auto pb-2">
                 <button
-                    className={`btn ${activeTab === 'PANEL' ? 'btn-primary' : 'btn-outline'}`}
+                    className={`btn whitespace-nowrap ${activeTab === 'PANEL' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => onTabChange('PANEL')}
                 >
-                    📊 Panel Financiero
+                    <BarChart3 size={16} strokeWidth={2.2} />
+                    Panel Financiero
                 </button>
                 <button
-                    className={`btn ${activeTab === 'ANALYTICS' ? 'btn-primary' : 'btn-outline'}`}
+                    className={`btn whitespace-nowrap ${activeTab === 'ANALYTICS' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => onTabChange('ANALYTICS')}
                 >
-                    📈 Control de Pérdidas
+                    <TrendingDown size={16} strokeWidth={2.2} />
+                    Control de Pérdidas
                 </button>
                 <button
-                    className={`btn ${activeTab === 'CALENDAR' ? 'btn-primary' : 'btn-outline'}`}
+                    className={`btn whitespace-nowrap ${activeTab === 'CALENDAR' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => onTabChange('CALENDAR')}
                 >
-                    📅 Calendario Histórico
+                    <CalendarDays size={16} strokeWidth={2.2} />
+                    Calendario Histórico
                 </button>
                 <button
-                    className={`btn ${activeTab === 'AUDIT' ? 'btn-primary' : 'btn-outline'} relative`}
+                    className={`btn whitespace-nowrap ${activeTab === 'AUDIT' ? 'btn-primary' : 'btn-outline'} relative`}
                     onClick={() => onTabChange('AUDIT')}
                 >
-                    📋 Pedidos Diarios
+                    <ClipboardList size={16} strokeWidth={2.2} />
+                    Pedidos Diarios
                     {pendingAudits > 0 && (
                         <span className="absolute -top-2 -right-2 bg-accent-red text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-md">
                             {pendingAudits}
@@ -96,28 +122,32 @@ export const MasterDashboard: React.FC<{
                     )}
                 </button>
                 <button
-                    className={`btn ${activeTab === 'CATALOG' ? 'btn-primary' : 'btn-outline'}`}
+                    className={`btn whitespace-nowrap ${activeTab === 'CATALOG' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => onTabChange('CATALOG')}
                 >
-                    🥩 Catálogo de Productos
+                    <Beef size={16} strokeWidth={2.2} />
+                    Catálogo de Productos
                 </button>
                 <button
-                    className={`btn ${activeTab === 'POS' ? 'btn-primary' : 'btn-outline'}`}
+                    className={`btn whitespace-nowrap ${activeTab === 'POS' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => onTabChange('POS')}
                 >
-                    🏪 Punto de Venta
+                    <Store size={16} strokeWidth={2.2} />
+                    Punto de Venta
                 </button>
                 <button
-                    className={`btn ${activeTab === 'CREATE' ? 'btn-primary' : 'btn-outline'}`}
+                    className={`btn whitespace-nowrap ${activeTab === 'CREATE' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => onTabChange('CREATE')}
                 >
-                    🗂 Gestión Diaria
+                    <FolderKanban size={16} strokeWidth={2.2} />
+                    Gestión Diaria
                 </button>
                 <button
-                    className={`btn ${activeTab === 'BACKUPS' ? 'btn-primary' : 'btn-outline'}`}
+                    className={`btn whitespace-nowrap ${activeTab === 'BACKUPS' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => onTabChange('BACKUPS')}
                 >
-                    💾 Copias de Seguridad
+                    <DatabaseBackup size={16} strokeWidth={2.2} />
+                    Copias de Seguridad
                 </button>
             </div>
 
@@ -147,28 +177,33 @@ export const MasterDashboard: React.FC<{
                     </div>
 
                     {(openCount > 0 || closedCount > 0 || pendingPedidoCount > 0) && (
-                        <div className="bg-gradient-to-r from-accent-red/15 to-accent-blue/10 border-2 border-accent-red/40 rounded-2xl p-5 mb-6 shadow-lg shadow-accent-red/10">
+                        <div className="bg-accent-red/10 border border-accent-red/30 rounded-2xl p-5 mb-6">
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div className="flex items-start gap-3">
-                                    <div className="text-3xl">🚨</div>
+                                    <div className="icon-chip icon-chip-red">
+                                        <AlertTriangle size={18} strokeWidth={2.2} />
+                                    </div>
                                     <div>
                                         <h4 className="font-black uppercase tracking-wider text-accent-red text-sm mb-1.5">
                                             Pedidos esperando tu acción
                                         </h4>
                                         <div className="flex flex-wrap gap-2">
                                             {pendingPedidoCount > 0 && (
-                                                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-accent-blue/20 text-accent-blue border border-accent-blue/30">
-                                                    📨 {pendingPedidoCount} sin aprobar
+                                                <span className="badge badge-blue gap-1.5">
+                                                    <Send size={12} strokeWidth={2.4} />
+                                                    {pendingPedidoCount} sin aprobar
                                                 </span>
                                             )}
                                             {openCount > 0 && (
-                                                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-accent-purple/20 text-purple-400 border border-purple-400/30">
-                                                    📋 {openCount} en curso (faltan sobrantes)
+                                                <span className="badge badge-purple gap-1.5">
+                                                    <ClipboardList size={12} strokeWidth={2.4} />
+                                                    {openCount} en curso (faltan sobrantes)
                                                 </span>
                                             )}
                                             {closedCount > 0 && (
-                                                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-accent-green/20 text-accent-green border border-accent-green/30">
-                                                    ✅ {closedCount} listos para aprobar
+                                                <span className="badge badge-green gap-1.5">
+                                                    <CheckCircle2 size={12} strokeWidth={2.4} />
+                                                    {closedCount} listos para aprobar
                                                 </span>
                                             )}
                                         </div>
@@ -181,7 +216,9 @@ export const MasterDashboard: React.FC<{
                                     onClick={() => onTabChange('AUDIT')}
                                     className="btn btn-primary whitespace-nowrap shrink-0"
                                 >
-                                    📋 Ver Pedidos Diarios →
+                                    <ClipboardList size={16} strokeWidth={2.2} />
+                                    Ver Pedidos Diarios
+                                    <ArrowRight size={16} strokeWidth={2.2} />
                                 </button>
                             </div>
                         </div>
@@ -190,26 +227,31 @@ export const MasterDashboard: React.FC<{
                     {!isPushEnabled && (
                         <div className="bg-accent-blue/10 border border-accent-blue/20 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <div className="text-3xl">🔔</div>
+                                <div className="icon-chip icon-chip-blue">
+                                    <Bell size={18} strokeWidth={2.2} />
+                                </div>
                                 <div>
                                     <h4 className="font-bold text-accent-blue leading-tight mb-1">Activar Notificaciones</h4>
                                     <p className="text-sm text-text-muted">Recibe avisos inmediatos cuando la cocina envíe nuevos pedidos para su revisión.</p>
                                 </div>
                             </div>
                             <button
-                                className="btn bg-accent-blue text-black hover:bg-accent-blue/90 whitespace-nowrap w-full sm:w-auto shrink-0"
+                                className="btn btn-primary whitespace-nowrap w-full sm:w-auto shrink-0"
                                 onClick={() => requestPushPermission()}
                             >
+                                <BellRing size={16} strokeWidth={2.2} />
                                 Permitir Avisos
                             </button>
                         </div>
                     )}
                     {isPushEnabled && (
-                        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="bg-accent-green/10 border border-accent-green/20 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <div className="text-3xl">✅</div>
+                                <div className="icon-chip icon-chip-green">
+                                    <CheckCircle2 size={18} strokeWidth={2.2} />
+                                </div>
                                 <div>
-                                    <h4 className="font-bold text-green-400 leading-tight mb-1">Notificaciones Activas</h4>
+                                    <h4 className="font-bold text-accent-green leading-tight mb-1">Notificaciones Activas</h4>
                                     <p className="text-sm text-text-muted">Recibirás avisos en tu pantalla de bloqueo cuando haya nuevos pedidos.</p>
                                 </div>
                             </div>
@@ -223,7 +265,8 @@ export const MasterDashboard: React.FC<{
                                     console.log('Push result:', result);
                                 }}
                             >
-                                Enviar Prueba 🧪
+                                <Send size={16} strokeWidth={2.2} />
+                                Enviar Prueba
                             </button>
                         </div>
                     )}
@@ -236,8 +279,8 @@ export const MasterDashboard: React.FC<{
                                     <div className="section-label mb-2">Gasto Histórico</div>
                                     <div className="text-[10px] text-text-muted">Coste total acumulado</div>
                                 </div>
-                                <div className="w-10 h-10 rounded-xl bg-accent-red/15 border border-accent-red/20 flex items-center justify-center text-base">
-                                    💸
+                                <div className="icon-chip icon-chip-red">
+                                    <Euro size={18} strokeWidth={2.2} />
                                 </div>
                             </div>
                             <div className="text-3xl font-black text-accent-red tracking-tight">
@@ -252,8 +295,8 @@ export const MasterDashboard: React.FC<{
                                     <div className="section-label mb-2">Servicios Registrados</div>
                                     <div className="text-[10px] text-text-muted">Cierres completados</div>
                                 </div>
-                                <div className="w-10 h-10 rounded-xl bg-accent-blue/15 border border-accent-blue/20 flex items-center justify-center text-base">
-                                    📊
+                                <div className="icon-chip icon-chip-blue">
+                                    <BarChart3 size={18} strokeWidth={2.2} />
                                 </div>
                             </div>
                             <div className="text-3xl font-black text-text-primary tracking-tight">
@@ -268,8 +311,8 @@ export const MasterDashboard: React.FC<{
                                     <div className="section-label mb-2">Pedidos Activos</div>
                                     <div className="text-[10px] text-text-muted">En curso o por auditar</div>
                                 </div>
-                                <div className="w-10 h-10 rounded-xl bg-accent-green/15 border border-accent-green/20 flex items-center justify-center text-base">
-                                    📦
+                                <div className="icon-chip icon-chip-green">
+                                    <Package size={18} strokeWidth={2.2} />
                                 </div>
                             </div>
                             <div className="text-3xl font-black text-accent-green tracking-tight">
@@ -280,11 +323,17 @@ export const MasterDashboard: React.FC<{
                     </div>
 
                     <div className="card">
-                        <h3 className="text-xl mb-6 flex items-center gap-2">
-                            <span>📦 Gestión de Pedidos y Gastos Activos</span>
+                        <h3 className="text-xl mb-6 flex items-center gap-3">
+                            <span className="icon-chip icon-chip-blue">
+                                <Package size={18} strokeWidth={2.2} />
+                            </span>
+                            <span>Gestión de Pedidos y Gastos Activos</span>
                         </h3>
                         {activeLogs.filter(l => ['PENDING_PEDIDO', 'OPEN', 'CLOSED'].includes(l.status)).length === 0 ? (
-                            <div className="text-center py-10 bg-white/5 rounded-xl border border-dashed border-white/10">
+                            <div className="empty-state">
+                                <div className="empty-state-icon">
+                                    <PackageOpen size={22} strokeWidth={2} />
+                                </div>
                                 <p className="text-text-muted uppercase tracking-widest text-xs font-bold">No hay pedidos o gastos activos en este momento</p>
                             </div>
                         ) : (
@@ -306,19 +355,20 @@ export const MasterDashboard: React.FC<{
                                             <div key={log.id} className="group p-4 bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 rounded-xl transition-all flex items-center justify-between">
                                                 <div className="flex flex-col gap-1">
                                                     <div className="font-bold flex items-center gap-2">
-                                                        <span className="text-accent-blue">📅</span>
+                                                        <CalendarDays size={15} strokeWidth={2.2} className="text-accent-blue shrink-0" />
                                                         {log.date}
-                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
-                                                            isPending ? 'bg-accent-blue/20 text-accent-blue' :
-                                                            isClosed ? 'bg-accent-green/20 text-accent-green' :
-                                                            'bg-accent-purple/20 text-accent-purple'
+                                                        <span className={`badge ${
+                                                            isPending ? 'badge-blue' :
+                                                            isClosed ? 'badge-green' :
+                                                            'badge-purple'
                                                         }`}>
                                                             {isPending ? 'Pendiente' : isClosed ? 'Por Auditar' : 'En Curso'}
                                                         </span>
                                                     </div>
                                                     {log.eventTitle && (
-                                                        <div className="text-xs font-bold text-text-muted uppercase tracking-tight line-clamp-1">
-                                                            🏠 {log.eventTitle.replace(' - Caseta:', '')}
+                                                        <div className="text-xs font-bold text-text-muted uppercase tracking-tight line-clamp-1 flex items-center gap-1.5">
+                                                            <Store size={12} strokeWidth={2.2} className="shrink-0" />
+                                                            {log.eventTitle.replace(' - Caseta:', '')}
                                                         </div>
                                                     )}
                                                     <div className="text-[10px] font-bold text-text-muted/60 uppercase tracking-widest">
@@ -335,7 +385,7 @@ export const MasterDashboard: React.FC<{
                                                         </div>
                                                     </div>
                                                     <button
-                                                        className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 p-2 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                                        className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 p-2 rounded-full transition-all md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             if (window.confirm("¿Borrar este pedido?")) {
@@ -343,8 +393,9 @@ export const MasterDashboard: React.FC<{
                                                             }
                                                         }}
                                                         title="Borrar pedido"
+                                                        aria-label="Borrar pedido"
                                                     >
-                                                        🗑️
+                                                        <Trash2 size={16} strokeWidth={2.2} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -356,9 +407,11 @@ export const MasterDashboard: React.FC<{
 
                     <FinancialFeriaReport />
 
-                    <div className="card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="card mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="text-3xl">💾</div>
+                            <div className="icon-chip icon-chip-gray">
+                                <DatabaseBackup size={18} strokeWidth={2.2} />
+                            </div>
                             <div>
                                 <h4 className="font-bold leading-tight mb-1">Copia de Seguridad</h4>
                                 <p className="text-sm text-text-muted">Descarga todos los datos (productos, stock, pedidos, eventos) a tu dispositivo.</p>
@@ -369,7 +422,17 @@ export const MasterDashboard: React.FC<{
                             onClick={downloadBackup}
                             disabled={isBackingUp}
                         >
-                            {isBackingUp ? '⏳ Descargando...' : '💾 Descargar Backup'}
+                            {isBackingUp ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Descargando...
+                                </>
+                            ) : (
+                                <>
+                                    <Download size={16} strokeWidth={2.2} />
+                                    Descargar Backup
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>

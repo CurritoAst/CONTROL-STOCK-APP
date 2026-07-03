@@ -5,6 +5,26 @@ import { DailyLog } from '../../types';
 
 
 import { printRawOrder } from '../../lib/printUtils';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ClipboardCheck,
+    ClipboardList,
+    Copy,
+    Inbox,
+    Link2,
+    Loader2,
+    Mail,
+    Minus,
+    Pencil,
+    Plus,
+    Printer,
+    Save,
+    Tent,
+    Trash2,
+    Wrench,
+    XCircle
+} from 'lucide-react';
 
 
 
@@ -72,8 +92,20 @@ export const DailyAudit: React.FC = () => {
 
     if (logsToAudit.length === 0) {
         return (
-            <div className="card text-center text-muted py-8">
-                No hay pedidos diarios pendientes o en curso en este momento.
+            <div className="animate-fade-in">
+                <div className="page-header">
+                    <div>
+                        <div className="section-label mb-2">Auditoría diaria</div>
+                        <h1 className="page-title">Pedidos Diarios</h1>
+                        <p className="page-subtitle">Aprobación, edición y cierre de los pedidos del día.</p>
+                    </div>
+                </div>
+                <div className="card">
+                    <div className="empty-state">
+                        <div className="empty-state-icon"><Inbox size={22} strokeWidth={2} /></div>
+                        <p className="mb-0">No hay pedidos diarios pendientes o en curso en este momento.</p>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -140,19 +172,30 @@ export const DailyAudit: React.FC = () => {
 
     return (
         <>
+        <div className="page-header animate-fade-in">
+            <div>
+                <div className="section-label mb-2">Auditoría diaria</div>
+                <h1 className="page-title">Pedidos Diarios</h1>
+                <p className="page-subtitle">Aprobación, edición y cierre de los pedidos del día.</p>
+            </div>
+        </div>
         <div className="flex flex-col gap-6">
             {hasPending && (
                 <div className="bg-accent-red/10 border border-accent-red/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <p className="font-bold text-accent-red">⚠️ Reparación de stock disponible</p>
-                        <p className="text-sm text-text-muted mt-1">Si hubo problemas al aprobar pedidos anteriormente, usa este botón para restaurar el stock correcto antes de aprobar.</p>
+                    <div className="flex items-start gap-3">
+                        <span className="icon-chip icon-chip-red"><AlertTriangle size={18} strokeWidth={2.2} /></span>
+                        <div>
+                            <p className="font-bold text-accent-red mb-0">Reparación de stock disponible</p>
+                            <p className="text-sm text-text-muted mt-1 mb-0">Si hubo problemas al aprobar pedidos anteriormente, usa este botón para restaurar el stock correcto antes de aprobar.</p>
+                        </div>
                     </div>
                     <button
-                        className="btn btn-outline border-accent-red/40 text-accent-red hover:bg-accent-red/10 whitespace-nowrap shrink-0 disabled:opacity-50"
+                        className="btn btn-outline border-accent-red/40 text-accent-red hover:bg-accent-red/10 whitespace-nowrap shrink-0"
                         onClick={handleRepairStock}
                         disabled={isRepairing}
                     >
-                        {isRepairing ? '⏳ Reparando...' : '🔧 Reparar Stock'}
+                        {isRepairing ? <Loader2 size={16} className="animate-spin" /> : <Wrench size={16} strokeWidth={2.2} />}
+                        {isRepairing ? 'Reparando...' : 'Reparar Stock'}
                     </button>
                 </div>
             )}
@@ -162,7 +205,7 @@ export const DailyAudit: React.FC = () => {
                     const isEditing = editingLogId === log.id;
 
                     return (
-                        <div key={log.id} className={`card animate-fade-in border-l-4 ${isPending ? 'border-l-accent-blue' : 'border-l-accent-purple'}`}>
+                        <div key={log.id} className={`card animate-fade-in border-l-4 ${isPending ? 'border-l-accent-blue' : 'border-l-purple-500'}`}>
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-white/10 pb-4 gap-4">
                                 <div>
                                     <h2 className="text-2xl mb-1">Pedido Diario {log.eventTitle ? `- ${log.eventTitle}` : ''}</h2>
@@ -172,29 +215,30 @@ export const DailyAudit: React.FC = () => {
                                     {!isPending && (
                                         <>
                                             <button
-                                                className="btn btn-outline border-accent-green/30 text-accent-green hover:bg-accent-green/10 text-xs py-1 px-2"
+                                                className="btn btn-outline btn-sm border-accent-green/30 text-accent-green hover:bg-accent-green/10"
                                                 onClick={() => printRawOrder(log)}
                                             >
-                                                🖨️ Imprimir Pedido
+                                                <Printer size={14} strokeWidth={2.2} /> Imprimir Pedido
                                             </button>
                                             <button
                                                 disabled={!!sendingEmail}
-                                                className="btn btn-outline border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 text-xs py-1 px-2 disabled:opacity-50"
+                                                className="btn btn-outline btn-sm border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
                                                 onClick={() => handleEmail(() => printRawOrder(log, true), log.id)}
                                             >
-                                                {sendingEmail === log.id ? '⏳ Enviando...' : '✉️ Email'}
+                                                {sendingEmail === log.id ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} strokeWidth={2.2} />}
+                                                {sendingEmail === log.id ? 'Enviando...' : 'Email'}
                                             </button>
                                         </>
                                     )}
                                     <button
-                                        className="btn btn-outline border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10 text-xs py-1 px-2"
+                                        className="btn btn-outline btn-sm border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10"
                                         onClick={() => { setDuplicateDate(''); setDuplicateModal({ logId: log.id, sourceDate: log.date }); }}
                                         title="Copiar este pedido a otra fecha"
                                     >
-                                        📋 Duplicar
+                                        <Copy size={14} strokeWidth={2.2} /> Duplicar
                                     </button>
                                     <button
-                                        className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 text-xs py-1 px-2"
+                                        className="btn btn-outline btn-sm border-accent-red/30 text-accent-red hover:bg-accent-red/10"
                                         onClick={() => {
                                             if (window.confirm("¿Seguro que quieres borrar este pedido por completo?")) {
                                                 deleteDailyLog(log.id);
@@ -202,7 +246,7 @@ export const DailyAudit: React.FC = () => {
                                             }
                                         }}
                                     >
-                                        🗑️ Borrar
+                                        <Trash2 size={14} strokeWidth={2.2} /> Borrar
                                     </button>
                                     <span className={`badge ${isPending ? 'badge-blue' : 'badge-purple'}`}>
                                         {isPending ? 'Esperando Aprobación Inicial' : 'Pedido Aceptado (En curso)'}
@@ -211,14 +255,17 @@ export const DailyAudit: React.FC = () => {
                             </div>
 
                             <div className="mb-6 overflow-x-auto pb-4">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-bold">Cantidades Solicitadas:</h3>
+                                <div className="flex justify-between items-center gap-3 mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="icon-chip icon-chip-blue"><ClipboardList size={18} strokeWidth={2.2} /></span>
+                                        <h3 className="text-lg font-bold mb-0">Cantidades Solicitadas:</h3>
+                                    </div>
                                     {!isEditing && (
                                         <button
-                                            className="btn btn-outline border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10 text-sm py-1"
+                                            className="btn btn-outline btn-sm border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10"
                                             onClick={() => startEditing(log)}
                                         >
-                                            ✏️ Editar Pedido
+                                            <Pencil size={14} strokeWidth={2.2} /> Editar Pedido
                                         </button>
                                     )}
                                 </div>
@@ -254,9 +301,9 @@ export const DailyAudit: React.FC = () => {
                                                             </div>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="flex items-center gap-2">
-                                                                    <button className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold" onClick={() => handleUpdateQuantity(product.id, qty - 1)}>-</button>
-                                                                    <span className={`text-xl font-bold w-10 text-center ${qty > 0 ? 'text-accent-blue' : 'text-text-muted'}`}>{qty}</span>
-                                                                    <button className="w-8 h-8 rounded-full bg-white/10 hover:bg-accent-blue/40 text-white flex items-center justify-center font-bold" onClick={() => handleUpdateQuantity(product.id, qty + 1)}>+</button>
+                                                                    <button aria-label={`Quitar una unidad de ${product.name}`} className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors" onClick={() => handleUpdateQuantity(product.id, qty - 1)}><Minus size={16} strokeWidth={2.4} /></button>
+                                                                    <span className={`text-xl font-bold num w-10 text-center ${qty > 0 ? 'text-accent-blue' : 'text-text-muted'}`}>{qty}</span>
+                                                                    <button aria-label={`Añadir una unidad de ${product.name}`} className="w-9 h-9 rounded-full bg-white/10 hover:bg-accent-blue/40 text-white flex items-center justify-center transition-colors" onClick={() => handleUpdateQuantity(product.id, qty + 1)}><Plus size={16} strokeWidth={2.4} /></button>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -267,8 +314,8 @@ export const DailyAudit: React.FC = () => {
 
                                         <div className="flex gap-4 mt-6 pt-4 border-t border-white/10">
                                             <button className="btn btn-outline flex-1" onClick={() => setEditingLogId(null)} disabled={isSaving}>Cancelar</button>
-                                            <button className="btn btn-primary flex-1 shadow-lg shadow-accent-blue/20 flex items-center justify-center gap-2" onClick={() => saveChanges(log.id)} disabled={isSaving}>
-                                                {isSaving ? <span className="animate-spin text-lg">⏳</span> : null}
+                                            <button className="btn btn-primary flex-1" onClick={() => saveChanges(log.id)} disabled={isSaving}>
+                                                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} strokeWidth={2.2} />}
                                                 {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                                             </button>
                                         </div>
@@ -277,14 +324,17 @@ export const DailyAudit: React.FC = () => {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         {log.items.map(item => (
                                             item.prepared > 0 && (
-                                                <div key={item.product.id} className="p-3 bg-white/5 rounded-md text-center">
+                                                <div key={item.product.id} className="p-3 bg-white/5 border border-white/5 rounded-xl text-center">
                                                     <div className="font-medium mb-2 truncate" title={item.product.name}>{item.product.name}</div>
-                                                    <div className="text-2xl font-bold text-accent-blue">{item.prepared}</div>
+                                                    <div className="text-2xl font-bold text-accent-blue num">{item.prepared}</div>
                                                 </div>
                                             )
                                         ))}
                                         {log.items.length === 0 && (
-                                            <div className="col-span-full text-text-muted text-center py-4 bg-black/20 rounded-md">Sin productos solicitados.</div>
+                                            <div className="col-span-full empty-state py-8">
+                                                <div className="empty-state-icon"><Inbox size={20} strokeWidth={2} /></div>
+                                                <p className="mb-0">Sin productos solicitados.</p>
+                                            </div>
                                         )}
                                     </div>
                                 )}
@@ -293,14 +343,14 @@ export const DailyAudit: React.FC = () => {
                             {!isEditing && isPending && (
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6">
                                     <button
-                                        className="btn btn-outline border-accent-red text-accent-red hover:bg-accent-red hover:text-white flex-1 text-lg py-4"
+                                        className="btn btn-danger flex-1 text-lg py-4"
                                         disabled={approvingId === log.id}
                                         onClick={() => { setRejectReason(''); setRejectModal({ logId: log.id, date: log.date }); }}
                                     >
-                                        ❌ Rechazar
+                                        <XCircle size={20} strokeWidth={2.2} /> Rechazar
                                     </button>
                                     <button
-                                        className="btn btn-primary flex-2 w-full sm:w-2/3 text-lg py-4 shadow-lg shadow-accent-blue/20 disabled:opacity-60"
+                                        className="btn btn-primary flex-1 sm:flex-[2] text-lg py-4"
                                         disabled={approvingId === log.id}
                                         onClick={async () => {
                                             setApprovingId(log.id);
@@ -314,7 +364,8 @@ export const DailyAudit: React.FC = () => {
                                             }
                                         }}
                                     >
-                                        {approvingId === log.id ? '⏳ Aprobando...' : '✅ Aprobar Pedido para el día ' + log.date}
+                                        {approvingId === log.id ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} strokeWidth={2.2} />}
+                                        {approvingId === log.id ? 'Aprobando...' : 'Aprobar Pedido para el día ' + log.date}
                                     </button>
                                 </div>
                             )}
@@ -333,9 +384,9 @@ export const DailyAudit: React.FC = () => {
                                     <p className="text-text-muted">Revisión del servicio del día: {log.date}</p>
                                 </div>
                                 <div className="flex flex-col gap-2 items-end">
-                                    <div className="text-3xl font-bold text-accent-red">{totalCost.toLocaleString('es-ES')} €</div>
+                                    <div className="text-3xl font-bold text-accent-red num">{totalCost.toLocaleString('es-ES')} €</div>
                                     <button
-                                        className="btn btn-outline border-accent-red/30 text-accent-red hover:bg-accent-red/10 text-xs py-1 px-2"
+                                        className="btn btn-outline btn-sm border-accent-red/30 text-accent-red hover:bg-accent-red/10"
                                         onClick={() => {
                                             if (window.confirm("¿Seguro que quieres borrar este pedido cerrado?")) {
                                                 deleteDailyLog(log.id);
@@ -343,41 +394,44 @@ export const DailyAudit: React.FC = () => {
                                             }
                                         }}
                                     >
-                                        🗑️ Borrar Histórico
+                                        <Trash2 size={14} strokeWidth={2.2} /> Borrar Histórico
                                     </button>
                                 </div>
                             </div>
 
                             <div className="mb-8">
-                                <h3 className="text-lg font-bold mb-4">Desglose de Consumos y Sobrantes:</h3>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <span className="icon-chip icon-chip-green"><ClipboardCheck size={18} strokeWidth={2.2} /></span>
+                                    <h3 className="text-lg font-bold mb-0">Desglose de Consumos y Sobrantes:</h3>
+                                </div>
                                 <div className="flex flex-col gap-3">
                                     {log.items.map(item => {
                                         const sobrante = item.prepared - item.consumed;
                                         const cost = item.consumed * item.product.price;
 
                                         return (
-                                            <div key={item.product.id} className="flex flex-col md:grid md:grid-cols-[1fr_auto_auto_auto_auto] gap-4 md:items-center p-4 bg-white/5 rounded-md border border-white/5">
+                                            <div key={item.product.id} className="flex flex-col md:grid md:grid-cols-[1fr_auto_auto_auto_auto] gap-4 md:items-center p-4 bg-white/5 rounded-xl border border-white/5">
                                                 <div className="font-bold text-lg border-b border-white/10 md:border-0 pb-2 md:pb-0">{item.product.name}</div>
 
                                                 <div className="grid grid-cols-2 md:flex md:flex-row gap-4 md:gap-0">
                                                     <div className="text-left md:text-center md:px-4 md:border-l border-white/10">
-                                                        <div className="text-text-muted text-xs uppercase mb-1">Pedido</div>
-                                                        <div className="text-lg font-medium">{item.prepared}</div>
+                                                        <div className="section-label mb-1">Pedido</div>
+                                                        <div className="text-lg font-medium num">{item.prepared}</div>
                                                     </div>
                                                     <div className="text-right md:text-center md:px-4 md:border-l border-white/10">
-                                                        <div className="text-text-muted text-xs uppercase mb-1">Consumido</div>
-                                                        <div className="font-bold text-lg text-accent-blue">{item.consumed}</div>
+                                                        <div className="section-label mb-1">Consumido</div>
+                                                        <div className="font-bold text-lg text-accent-blue num">{item.consumed}</div>
                                                     </div>
                                                 </div>
 
                                                 <div className="grid grid-cols-2 md:flex md:flex-row gap-4 md:gap-0 mt-2 md:mt-0 pt-2 md:pt-0 border-t border-white/5 md:border-0">
                                                     <div className="text-left md:text-center md:px-4 md:border-l border-white/10">
-                                                        <div className="text-text-muted text-xs uppercase mb-1">Sobrante</div>
-                                                        <div className={`text-lg font-bold ${sobrante < 0 ? 'text-accent-red' : 'text-accent-green'}`}>{sobrante}</div>
+                                                        <div className="section-label mb-1">Sobrante</div>
+                                                        <div className={`text-lg font-bold num ${sobrante < 0 ? 'text-accent-red' : 'text-accent-green'}`}>{sobrante}</div>
                                                     </div>
                                                     <div className="text-right md:px-4 md:border-l border-white/10 md:min-w-[100px]">
-                                                        <div className="text-text-muted text-xs uppercase mb-1">Coste</div>
-                                                        <div className="text-accent-red font-bold text-lg">{cost.toLocaleString('es-ES')} €</div>
+                                                        <div className="section-label mb-1">Coste</div>
+                                                        <div className="text-accent-red font-bold text-lg num">{cost.toLocaleString('es-ES')} €</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -396,11 +450,11 @@ export const DailyAudit: React.FC = () => {
                                 const casetasForSelected = selectedFeria ? (casetasByFeria[selectedFeria] || []) : [];
                                 return (
                                     <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-4 mb-4 animate-fade-in">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="text-xl">🎪</span>
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <span className="icon-chip icon-chip-blue"><Tent size={18} strokeWidth={2.2} /></span>
                                             <div>
-                                                <p className="font-bold text-accent-blue text-sm">Asociar Pedido Extra a una feria / caseta</p>
-                                                <p className="text-[11px] text-text-muted">Sumará al total e integrará en la factura final del evento.</p>
+                                                <p className="font-bold text-accent-blue text-sm mb-0">Asociar Pedido Extra a una feria / caseta</p>
+                                                <p className="text-[11px] text-text-muted mb-0">Sumará al total e integrará en la factura final del evento.</p>
                                             </div>
                                         </div>
                                         <div className="flex flex-col sm:flex-row gap-2 mb-2">
@@ -449,7 +503,8 @@ export const DailyAudit: React.FC = () => {
                                             }}
                                             className="btn btn-outline border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 disabled:opacity-50 text-xs px-4 w-full"
                                         >
-                                            {isAssigning ? '⏳ Asociando...' : selectedCaseta ? `🔗 Asociar a ${selectedFeria} / ${selectedCaseta}` : selectedFeria ? `🔗 Asociar a ${selectedFeria}` : '🔗 Asociar'}
+                                            {isAssigning ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} strokeWidth={2.2} />}
+                                            {isAssigning ? 'Asociando...' : selectedCaseta ? `Asociar a ${selectedFeria} / ${selectedCaseta}` : selectedFeria ? `Asociar a ${selectedFeria}` : 'Asociar'}
                                         </button>
                                     </div>
                                 );
@@ -462,7 +517,7 @@ export const DailyAudit: React.FC = () => {
                                     addToast(`Servicio del día ${log.date} cerrado y registrado correctamente`, "success");
                                 }}
                             >
-                                ✅ Aprobar Servicio y Registrar Costes
+                                <CheckCircle2 size={20} strokeWidth={2.2} /> Aprobar Servicio y Registrar Costes
                             </button>
                         </div>
                     );
@@ -474,9 +529,12 @@ export const DailyAudit: React.FC = () => {
 
             {/* Duplicate order modal */}
             {duplicateModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-bg-elevated border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
-                        <h3 className="text-xl font-bold">📋 Duplicar Pedido</h3>
+                <div className="modal-overlay">
+                    <div className="modal-panel max-w-md flex flex-col gap-4">
+                        <h3 className="text-xl font-bold mb-0 flex items-center gap-3">
+                            <span className="icon-chip icon-chip-blue"><Copy size={18} strokeWidth={2.2} /></span>
+                            Duplicar Pedido
+                        </h3>
                         <p className="text-text-muted text-sm">
                             Copia todos los productos del pedido del <strong className="text-white">{duplicateModal.sourceDate}</strong> a una nueva fecha.
                         </p>
@@ -512,7 +570,8 @@ export const DailyAudit: React.FC = () => {
                                     }
                                 }}
                             >
-                                {isDuplicating ? '⏳ Duplicando...' : '📋 Duplicar'}
+                                {isDuplicating ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} strokeWidth={2.2} />}
+                                {isDuplicating ? 'Duplicando...' : 'Duplicar'}
                             </button>
                         </div>
                     </div>
@@ -521,9 +580,12 @@ export const DailyAudit: React.FC = () => {
 
             {/* Reject reason modal */}
             {rejectModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-bg-elevated border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
-                        <h3 className="text-xl font-bold">❌ Rechazar Pedido</h3>
+                <div className="modal-overlay">
+                    <div className="modal-panel max-w-md flex flex-col gap-4">
+                        <h3 className="text-xl font-bold mb-0 flex items-center gap-3">
+                            <span className="icon-chip icon-chip-red"><XCircle size={18} strokeWidth={2.2} /></span>
+                            Rechazar Pedido
+                        </h3>
                         <p className="text-text-muted text-sm">
                             Pedido del <strong className="text-white">{rejectModal.date}</strong>. Puedes añadir un motivo de rechazo para que la cocina lo vea en la notificación.
                         </p>
@@ -543,7 +605,7 @@ export const DailyAudit: React.FC = () => {
                                 Cancelar
                             </button>
                             <button
-                                className="btn btn-outline border-accent-red text-accent-red hover:bg-accent-red hover:text-white flex-1"
+                                className="btn btn-danger flex-1"
                                 onClick={async () => {
                                     if (!rejectModal) return;
                                     const { logId, date } = rejectModal;
@@ -559,7 +621,7 @@ export const DailyAudit: React.FC = () => {
                                     }
                                 }}
                             >
-                                Confirmar Rechazo
+                                <XCircle size={16} strokeWidth={2.2} /> Confirmar Rechazo
                             </button>
                         </div>
                     </div>

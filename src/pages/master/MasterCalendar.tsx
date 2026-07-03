@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { CalendarDays, CheckCircle2, Package, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { DailyLog } from '../../types';
 
@@ -55,21 +56,22 @@ export const MasterCalendar: React.FC = () => {
                     key={day}
                     onClick={() => log && setSelectedDate(dateStr)}
                     disabled={!log}
-                    className={`p-3 md:p-4 border border-white/5 rounded-md flex flex-col items-center justify-center transition-all ${log ? (isSelected ? 'bg-accent-blue text-white shadow-lg' : 'bg-bg-elevated/50 hover:bg-bg-elevated cursor-pointer')
+                    className={`p-2 sm:p-3 border border-white/5 rounded-lg flex flex-col items-center justify-center transition-all ${log ? (isSelected ? 'bg-accent-blue text-white shadow-lg shadow-accent-blue/30 scale-105 z-10' : 'bg-bg-elevated/40 hover:bg-bg-elevated cursor-pointer')
                         : 'opacity-30 cursor-not-allowed'
                         }`}
                 >
-                    <span className="text-lg font-medium">{day}</span>
+                    <span className="text-lg sm:text-xl font-bold">{day}</span>
                     {log && (
-                        <div className={`text-xs mt-1 ${isSelected ? 'text-white/80' : 'text-accent-green'}`}>
-                            Registrado
+                        <div className={`text-xs mt-1 flex items-center gap-1 ${isSelected ? 'text-white/90 font-bold' : 'text-accent-green'}`}>
+                            Registrado <CheckCircle2 size={11} className="shrink-0" />
                         </div>
                     )}
                     {/* RenderAdminEvents in Master View */}
                     <div className="mt-1 flex flex-col gap-1 w-full overflow-hidden">
                         {events.filter(e => e.date === dateStr).slice(0, 2).map(e => (
-                            <div key={e.id} className={`text-[9px] sm:text-[10px] truncate px-1 rounded-sm w-full text-left ${e.type === 'EVENT' ? 'bg-accent-blue/30 text-accent-blue' : 'bg-accent-green/30 text-accent-green'}`} title={e.title}>
-                                {e.type === 'EVENT' ? '📅 ' : '📦 '}{e.title}
+                            <div key={e.id} className={`text-[9px] sm:text-[10px] flex items-center gap-1 px-1 py-0.5 rounded-sm w-full text-left ${e.type === 'EVENT' ? 'bg-accent-blue/30 text-accent-blue' : 'bg-accent-green/30 text-accent-green'}`} title={e.title}>
+                                {e.type === 'EVENT' ? <CalendarDays size={9} className="shrink-0" /> : <Package size={9} className="shrink-0" />}
+                                <span className="truncate">{e.title}</span>
                             </div>
                         ))}
                     </div>
@@ -83,8 +85,11 @@ export const MasterCalendar: React.FC = () => {
     const renderDailyDetail = () => {
         if (!selectedDate) {
             return (
-                <div className="card text-center text-text-muted py-12">
-                    Selecciona un día en el calendario que tenga registro para ver su análisis detallado.
+                <div className="card">
+                    <div className="empty-state">
+                        <div className="empty-state-icon"><CalendarDays size={20} /></div>
+                        <p className="mb-0 text-text-muted">Selecciona un día en el calendario que tenga registro para ver su análisis detallado.</p>
+                    </div>
                 </div>
             );
         }
@@ -126,56 +131,59 @@ export const MasterCalendar: React.FC = () => {
         // 30% food cost assumption for gross profit (Ganancia = Ventas - Coste Producto)
 
         return (
-            <div className="card animate-fade-in mt-6 border-t-[6px] border-t-accent-blue shadow-2xl">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                    <div>
-                        <h3 className="text-2xl font-black mb-1">Análisis de Servicio</h3>
-                        <p className="text-text-muted text-sm font-bold uppercase tracking-wider">📅 {selectedDate}</p>
+            <div className="card animate-fade-in">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div className="flex items-center gap-3">
+                        <span className="icon-chip icon-chip-blue"><BarChart3 size={18} /></span>
+                        <div>
+                            <h3 className="text-xl font-bold mb-0.5">Análisis de Servicio</h3>
+                            <p className="text-text-muted text-xs mb-0 flex items-center gap-1.5"><CalendarDays size={12} className="shrink-0" /> {selectedDate}</p>
+                        </div>
                     </div>
-                    <span className="badge badge-blue py-2 px-4 text-[10px]">SERVICIO AUDITADO</span>
+                    <span className="badge badge-blue">SERVICIO AUDITADO</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-                    <div className="bg-bg-primary/40 p-6 rounded-2xl border border-white/5 text-center shadow-inner">
-                        <div className="text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Inversión Consumida</div>
-                        <div className="text-3xl font-black text-accent-red">{totalGasto.toLocaleString('es-ES')} €</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                    <div className="stat-card">
+                        <div className="section-label mb-2">Inversión Consumida</div>
+                        <div className="text-3xl font-bold num text-accent-red">{totalGasto.toLocaleString('es-ES')} €</div>
                     </div>
-                    <div className="bg-accent-blue/5 p-6 rounded-2xl border border-accent-blue/10 text-center shadow-inner">
-                        <div className="text-accent-blue text-[10px] font-black uppercase tracking-widest mb-2">Retorno de Mercancía</div>
-                        <div className="text-3xl font-black text-accent-blue">{totalSobranteGasto.toLocaleString('es-ES')} €</div>
+                    <div className="stat-card">
+                        <div className="section-label text-accent-blue mb-2">Retorno de Mercancía</div>
+                        <div className="text-3xl font-bold num text-accent-blue">{totalSobranteGasto.toLocaleString('es-ES')} €</div>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto -mx-6 px-6">
-                    <table className="w-full text-left border-separate border-spacing-y-2">
+                <div className="table-wrap">
+                    <table className="data-table">
                         <thead>
-                            <tr className="text-text-muted text-[10px] font-black uppercase tracking-widest">
-                                <th className="px-4 py-2">Producto</th>
-                                <th className="px-4 py-2 text-center">PED</th>
-                                <th className="px-4 py-2 text-center">SOB</th>
-                                <th className="px-4 py-2 text-center">MERMA</th>
-                                <th className="px-4 py-2 text-right">VALOR (€)</th>
+                            <tr>
+                                <th>Producto</th>
+                                <th className="text-right">PED</th>
+                                <th className="text-right">SOB</th>
+                                <th className="text-right">MERMA</th>
+                                <th className="text-right">VALOR (€)</th>
                             </tr>
                         </thead>
-                        <tbody className="text-xs">
+                        <tbody>
                             {itemDetails.map(d => (
-                                <tr key={d.product.id} className="bg-white/[0.02] hover:bg-white/[0.05] transition-colors rounded-xl group">
-                                    <td className="px-4 py-3 font-bold rounded-l-xl border-l border-white/5">{d.product.name}</td>
-                                    <td className="px-4 py-3 text-center text-text-muted font-bold">{d.prepared}</td>
-                                    <td className="px-4 py-3 text-center font-black text-accent-blue">{d.sobrante}</td>
-                                    <td className="px-4 py-3 text-center">
-                                        <span className={`px-2 py-1 rounded text-[10px] font-black ${d.porcentajeSobrante > 30 ? 'bg-accent-red/20 text-accent-red' : 'bg-white/10 text-text-muted'}`}>
+                                <tr key={d.product.id}>
+                                    <td className="font-semibold">{d.product.name}</td>
+                                    <td className="text-right num text-text-muted">{d.prepared}</td>
+                                    <td className="text-right num font-semibold text-accent-blue">{d.sobrante}</td>
+                                    <td className="text-right">
+                                        <span className={`badge ${d.porcentajeSobrante > 30 ? 'badge-red' : 'badge-gray'}`}>
                                             {d.porcentajeSobrante.toFixed(0)}%
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-right font-black text-accent-red rounded-r-xl border-r border-white/5">{d.gastoReal.toLocaleString('es-ES')} €</td>
+                                    <td className="text-right num font-semibold text-accent-red">{d.gastoReal.toLocaleString('es-ES')} €</td>
                                 </tr>
                             ))}
                         </tbody>
                         <tfoot>
-                            <tr className="font-black bg-bg-elevated/20 text-sm">
-                                <td colSpan={4} className="px-4 py-4 text-right rounded-l-xl">RESUMEN DIARIO</td>
-                                <td className="px-4 py-4 text-right text-accent-red rounded-r-xl">{totalGasto.toLocaleString('es-ES')} €</td>
+                            <tr className="border-t border-white/10 bg-white/5">
+                                <td colSpan={4} className="text-right text-[10px] font-bold uppercase tracking-[0.15em] text-text-muted">RESUMEN DIARIO</td>
+                                <td className="text-right num font-bold text-accent-red">{totalGasto.toLocaleString('es-ES')} €</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -188,25 +196,25 @@ export const MasterCalendar: React.FC = () => {
 
     return (
         <div className="animate-fade-in w-full space-y-6">
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Calendario Histórico</h1>
+                    <p className="page-subtitle">Control de costes por fecha</p>
+                </div>
+            </div>
+
             <div className="card">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                    <div>
-                        <h2 className="text-3xl font-black mb-1">Calendario Histórico</h2>
-                        <p className="text-text-muted text-sm font-bold uppercase tracking-wider">Control de costes por fecha</p>
-                    </div>
+                <div className="flex justify-between items-center gap-2 mb-4 bg-bg-elevated/30 p-2 rounded-xl">
+                    <button className="btn btn-outline px-3 py-2" onClick={prevMonth} aria-label="Mes anterior"><ChevronLeft size={16} /></button>
+                    <h3 className="text-base sm:text-lg font-bold mb-0 text-center">{monthNames[month]} {year}</h3>
+                    <button className="btn btn-outline px-3 py-2" onClick={nextMonth} aria-label="Mes siguiente"><ChevronRight size={16} /></button>
                 </div>
 
-                <div className="flex justify-between items-center mb-8 bg-bg-primary/40 p-3 rounded-2xl border border-white/5 shadow-inner">
-                    <button className="btn btn-outline py-2 px-4 shadow-none" onClick={prevMonth}>&larr;</button>
-                    <h3 className="text-xl font-black text-accent-blue uppercase tracking-tight">{monthNames[month]} {year}</h3>
-                    <button className="btn btn-outline py-2 px-4 shadow-none" onClick={nextMonth}>&rarr;</button>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 md:gap-3 mb-4 text-center text-text-muted font-black text-[10px] uppercase tracking-widest px-1">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center section-label px-1">
                     <div>L</div><div>M</div><div>M</div><div>J</div><div>V</div><div>S</div><div>D</div>
                 </div>
 
-                <div className="grid grid-cols-7 gap-1 md:gap-3">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2">
                     {renderCalendar()}
                 </div>
             </div>

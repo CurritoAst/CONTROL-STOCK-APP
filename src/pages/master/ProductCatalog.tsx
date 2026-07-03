@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, memo } from 'react';
+import { Search, Plus, Pencil, Trash2, Package, PackageOpen, AlertTriangle, XCircle, Save, Tags } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { Product } from '../../types';
@@ -32,13 +33,13 @@ const ProductRow = memo(({
 
     return (
         <div
-            className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-2xl gap-4 transition-all group shadow-lg
+            className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl gap-4 transition-all group
                 ${isZero ? 'border-accent-red/30 bg-accent-red/5 hover:border-accent-red/50' :
                   isLow ? 'border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/50' :
                   'border-white/5 bg-black/40 hover:border-white/10 hover:bg-black/60'}`}
         >
-            <div className="flex-1">
-                <div className={`font-black text-lg tracking-tight mb-1 group-hover:text-accent-blue transition-colors ${isZero ? 'text-accent-red/80' : isLow ? 'text-yellow-400' : ''}`}>
+            <div className="flex-1 min-w-0">
+                <div className={`font-semibold tracking-tight mb-1.5 group-hover:text-accent-blue transition-colors ${isZero ? 'text-accent-red/80' : isLow ? 'text-yellow-400' : 'text-text-primary'}`}>
                     {product.name}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -49,7 +50,8 @@ const ProductRow = memo(({
                             autoFocus
                             type="number"
                             min="0"
-                            className="w-20 text-center text-xs font-bold p-1 rounded border border-accent-blue bg-accent-blue/10 text-accent-blue outline-none"
+                            aria-label="Editar stock"
+                            className="w-20 text-center text-xs font-bold num p-1 rounded border border-accent-blue bg-accent-blue/10 text-accent-blue outline-none"
                             value={quickEditVal}
                             onChange={e => onQuickEditChange(e.target.value)}
                             onBlur={onQuickEditSave}
@@ -61,7 +63,7 @@ const ProductRow = memo(({
                         />
                     ) : (
                         <span
-                            className={`badge cursor-pointer select-none text-[9px] transition-opacity hover:opacity-70 ${
+                            className={`badge gap-1 cursor-pointer select-none text-[9px] transition-opacity hover:opacity-70 ${
                                 isZero ? 'badge-red' :
                                 isLow ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
                                 'badge-green'
@@ -69,7 +71,9 @@ const ProductRow = memo(({
                             title="Clic para editar stock"
                             onClick={e => { e.stopPropagation(); onQuickEditStart(); }}
                         >
-                            {isZero ? '❌ ' : isLow ? '⚠️ ' : ''}STOCK: {product.stock} ✏️
+                            {isZero ? <XCircle size={11} strokeWidth={2.4} /> : isLow ? <AlertTriangle size={11} strokeWidth={2.4} /> : null}
+                            STOCK: {product.stock}
+                            <Pencil size={10} strokeWidth={2.4} />
                         </span>
                     )}
 
@@ -82,14 +86,14 @@ const ProductRow = memo(({
             </div>
             <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-white/5">
                 <div className="text-right">
-                    <div className="text-2xl font-black italic tracking-tighter">
-                        {product.price.toLocaleString('es-ES')} <span className="text-xs text-text-muted not-italic">€</span>
+                    <div className="text-xl font-bold tracking-tight num">
+                        {product.price.toLocaleString('es-ES')} <span className="text-xs font-normal text-text-muted">€</span>
                     </div>
-                    <div className="text-[9px] font-black uppercase text-accent-blue tracking-widest">P. Unitario</div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.15em] text-text-muted">P. Unitario</div>
                 </div>
                 <div className="flex gap-2">
-                    <button className="w-10 h-10 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-lg transition-all" title="Editar" onClick={onEdit}>✏️</button>
-                    <button className="w-10 h-10 flex items-center justify-center bg-accent-red/10 border border-accent-red/20 rounded-xl hover:bg-accent-red/20 text-lg transition-all" title="Eliminar" onClick={onDelete}>🗑️</button>
+                    <button className="w-10 h-10 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl text-text-secondary hover:bg-white/10 hover:text-text-primary transition-colors" title="Editar" aria-label="Editar" onClick={onEdit}><Pencil size={16} strokeWidth={2.2} /></button>
+                    <button className="w-10 h-10 flex items-center justify-center bg-accent-red/10 border border-accent-red/20 rounded-xl text-accent-red hover:bg-accent-red/20 transition-colors" title="Eliminar" aria-label="Eliminar" onClick={onDelete}><Trash2 size={16} strokeWidth={2.2} /></button>
                 </div>
             </div>
         </div>
@@ -198,8 +202,11 @@ export const ProductCatalog: React.FC = () => {
 
     if (isEditing) {
         return (
-            <div className="card max-w-lg mx-auto">
-                <h3 className="text-xl mb-4 font-bold">{editingId === 'new' ? 'Nuevo Producto' : 'Editar Producto'}</h3>
+            <div className="card max-w-lg mx-auto animate-fade-in">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="icon-chip icon-chip-blue"><Package size={18} strokeWidth={2.2} /></div>
+                    <h3 className="text-xl font-bold mb-0">{editingId === 'new' ? 'Nuevo Producto' : 'Editar Producto'}</h3>
+                </div>
                 <div className="input-group">
                     <label>Nombre del Producto</label>
                     <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Ej. Entrecot" />
@@ -208,9 +215,9 @@ export const ProductCatalog: React.FC = () => {
                     <label>Precio / Coste Unitario (€)</label>
                     <input type="number" min="0" step="0.01" value={formData.price || ''} onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} />
                 </div>
-                <div className="input-group mb-6">
+                <div className="input-group">
                     <label>Categoría</label>
-                    <select value={formData.category || 'General'} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue">
+                    <select value={formData.category || 'General'} onChange={e => setFormData({ ...formData, category: e.target.value })}>
                         {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                 </div>
@@ -218,60 +225,88 @@ export const ProductCatalog: React.FC = () => {
                     <label>Stock Total (Almacén)</label>
                     <input type="number" min="0" value={formData.stock === undefined ? '' : formData.stock} onChange={e => setFormData({ ...formData, stock: Number(e.target.value) })} />
                 </div>
-                <div className="flex gap-md">
+                <div className="flex gap-3 pt-2">
                     <button className="btn btn-outline w-full" onClick={() => setEditingId(null)}>Cancelar</button>
-                    <button className="btn btn-success w-full" onClick={handleSave}>Guardar</button>
+                    <button className="btn btn-success w-full" onClick={handleSave}><Save size={16} strokeWidth={2.2} /> Guardar</button>
                 </div>
             </div>
         );
     }
 
     return (
-        <>
-            <div className="card">
-                {/* Header */}
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
-                    <h2 className="text-2xl mb-1">Catálogo de Productos y Costes</h2>
-                    <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
+        <div className="animate-fade-in">
+            {/* Header */}
+            <div className="page-header">
+                <div>
+                    <div className="section-label mb-2">Inventario</div>
+                    <h1 className="page-title">Catálogo de Productos y Costes</h1>
+                    <p className="page-subtitle">{products.length} producto{products.length !== 1 ? 's' : ''} · {allCategories.length} categoría{allCategories.length !== 1 ? 's' : ''}</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto sm:items-center">
+                    <div className="relative w-full sm:w-64">
+                        <Search size={16} strokeWidth={2.2} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                         <input
                             type="text"
                             placeholder="Buscar producto..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-56 placeholder:text-text-muted"
+                            className="w-full pl-10 placeholder:text-text-muted"
                         />
-                        <div className="flex flex-wrap w-full sm:w-auto gap-2 items-center">
-                            <select
-                                value={selectedCategory}
-                                onChange={e => setSelectedCategory(e.target.value)}
-                                className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue w-full sm:w-auto"
-                            >
-                                {allCategories.map(cat => <option key={cat} value={cat}>{cat === 'General' ? 'Todas (General)' : cat}</option>)}
-                            </select>
-                            <select
-                                value={sortBy}
-                                onChange={e => setSortBy(e.target.value as typeof sortBy)}
-                                className="bg-bg-primary/50 border border-white/20 rounded p-2 text-white outline-none focus:border-accent-blue text-sm"
-                                title="Ordenar por"
-                            >
-                                <option value="name">A–Z</option>
-                                <option value="stock_asc">Stock ↑</option>
-                                <option value="stock_desc">Stock ↓</option>
-                            </select>
-                            <button className="btn btn-outline" title="Añadir nueva sección" onClick={() => { setNewCategoryName(''); setIsAddingCategory(true); }}>+</button>
-                            {selectedCategory !== 'General' &&
-                                <button className="btn btn-outline text-accent-red border-accent-red/50 hover:bg-accent-red/10" title="Eliminar esta sección" onClick={() => setItemToDelete({ type: 'category', name: selectedCategory })}>🗑️</button>
-                            }
-                            <button className="btn btn-primary whitespace-nowrap" onClick={handeNew}>+ Añadir</button>
-                        </div>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                        <select
+                            value={sortBy}
+                            onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                            className="w-full sm:w-auto text-sm"
+                            title="Ordenar por"
+                        >
+                            <option value="name">A–Z</option>
+                            <option value="stock_asc">Stock ↑</option>
+                            <option value="stock_desc">Stock ↓</option>
+                        </select>
+                        <button className="btn btn-primary whitespace-nowrap shrink-0" onClick={handeNew}><Plus size={16} strokeWidth={2.4} /> Añadir</button>
                     </div>
                 </div>
+            </div>
+
+            {/* Category chips */}
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+                {allCategories.map(cat => (
+                    <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                            selectedCategory === cat
+                                ? 'bg-accent-blue text-white border-accent-blue shadow-lg shadow-accent-blue/20'
+                                : 'bg-white/5 text-text-secondary border-white/10 hover:bg-white/10 hover:text-text-primary'
+                        }`}
+                    >
+                        {cat === 'General' ? 'Todas (General)' : cat}
+                    </button>
+                ))}
+                <button
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-text-secondary hover:bg-white/10 hover:text-text-primary transition-colors"
+                    title="Añadir nueva sección"
+                    aria-label="Añadir nueva sección"
+                    onClick={() => { setNewCategoryName(''); setIsAddingCategory(true); }}
+                ><Plus size={14} strokeWidth={2.4} /></button>
+                {selectedCategory !== 'General' &&
+                    <button
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-accent-red/10 border border-accent-red/20 text-accent-red hover:bg-accent-red/20 transition-colors"
+                        title="Eliminar esta sección"
+                        aria-label="Eliminar esta sección"
+                        onClick={() => setItemToDelete({ type: 'category', name: selectedCategory })}
+                    ><Trash2 size={14} strokeWidth={2.2} /></button>
+                }
+            </div>
+
+            <div className="card">
 
                 {/* Alertas de stock */}
                 {(lowStockProducts.length > 0 || zeroStockProducts.length > 0) && (
                     <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-start gap-3">
-                            <span className="text-2xl">⚠️</span>
+                            <div className="icon-chip bg-yellow-500/15 border-yellow-500/25 text-yellow-400"><AlertTriangle size={18} strokeWidth={2.2} /></div>
                             <div>
                                 <p className="font-bold text-yellow-400 mb-1">Alerta de Stock</p>
                                 <div className="flex flex-wrap gap-3 text-sm">
@@ -286,7 +321,7 @@ export const ProductCatalog: React.FC = () => {
                         </div>
                         <button
                             onClick={() => setShowOnlyLowStock(s => !s)}
-                            className={`btn text-sm shrink-0 ${showOnlyLowStock ? 'btn-primary' : 'btn-outline border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10'}`}
+                            className={`btn btn-sm shrink-0 ${showOnlyLowStock ? 'btn-primary' : 'btn-outline border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10'}`}
                         >
                             {showOnlyLowStock ? 'Ver todos' : 'Ver críticos'}
                         </button>
@@ -294,15 +329,15 @@ export const ProductCatalog: React.FC = () => {
                 )}
 
                 {/* Product list */}
-                <div className="space-y-12">
+                <div className="space-y-8">
                     {Object.entries(groupedByCategory).map(([category, items]) => (
                         <div key={category}>
-                            <div className="flex items-center gap-4 mb-6">
+                            <div className="flex items-center gap-4 mb-4">
                                 <div className="flex items-baseline gap-2 whitespace-nowrap">
-                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent-blue leading-none">{category}</h3>
+                                    <h3 className="section-label !text-accent-blue leading-none mb-0">{category}</h3>
                                     <span className="text-[10px] text-text-muted leading-none">{items.length} producto{items.length !== 1 ? 's' : ''}</span>
                                 </div>
-                                <div className="h-px w-full bg-gradient-to-r from-accent-blue/40 to-transparent"></div>
+                                <div className="divider-gradient flex-1"></div>
                             </div>
                             <div className="grid gap-3">
                                 {items.map(product => (
@@ -323,24 +358,30 @@ export const ProductCatalog: React.FC = () => {
                         </div>
                     ))}
                     {Object.keys(groupedByCategory).length === 0 && (
-                        <div className="text-center py-10 text-text-muted">No hay productos que coincidan con los filtros.</div>
+                        <div className="empty-state">
+                            <div className="empty-state-icon"><PackageOpen size={22} strokeWidth={2} /></div>
+                            <p className="mb-0">No hay productos que coincidan con los filtros.</p>
+                        </div>
                     )}
                 </div>
             </div>
 
             {/* Delete confirm modal */}
             {itemToDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-bg-primary p-6 rounded-lg border border-white/10 max-w-md w-full shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4 text-accent-red">Confirmar eliminación</h3>
-                        <p className="mb-6 text-white/90 leading-relaxed">
+                <div className="modal-overlay">
+                    <div className="modal-panel max-w-md">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="icon-chip icon-chip-red"><AlertTriangle size={18} strokeWidth={2.2} /></div>
+                            <h3 className="text-xl font-bold mb-0 text-accent-red">Confirmar eliminación</h3>
+                        </div>
+                        <p className="mb-6 text-text-secondary leading-relaxed">
                             {itemToDelete.type === 'product'
                                 ? `¿Estás seguro de que deseas eliminar el producto "${itemToDelete.name}"? Esta acción no se puede deshacer.`
                                 : `¿Estás seguro de que deseas eliminar la sección "${itemToDelete.name}"? Todos los productos pasarán a "General".`}
                         </p>
-                        <div className="flex gap-4 justify-end">
+                        <div className="flex gap-3 justify-end">
                             <button className="btn btn-outline" onClick={() => setItemToDelete(null)}>Cancelar</button>
-                            <button className="btn btn-success bg-accent-red border-accent-red text-white hover:bg-accent-red/80" onClick={confirmDelete}>Eliminar</button>
+                            <button className="btn btn-danger" onClick={confirmDelete}><Trash2 size={16} strokeWidth={2.2} /> Eliminar</button>
                         </div>
                     </div>
                 </div>
@@ -348,9 +389,12 @@ export const ProductCatalog: React.FC = () => {
 
             {/* Add category modal */}
             {isAddingCategory && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-bg-primary p-6 rounded-lg border border-white/10 max-w-md w-full shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4 text-accent-blue">Añadir nueva sección</h3>
+                <div className="modal-overlay">
+                    <div className="modal-panel max-w-md">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="icon-chip icon-chip-blue"><Tags size={18} strokeWidth={2.2} /></div>
+                            <h3 className="text-xl font-bold mb-0 text-accent-blue">Añadir nueva sección</h3>
+                        </div>
                         <div className="input-group mb-6">
                             <input
                                 type="text"
@@ -364,19 +408,19 @@ export const ProductCatalog: React.FC = () => {
                                     }
                                 }}
                                 placeholder="Ej. Congelados..."
-                                className="w-full bg-black/30 border border-white/20 rounded p-3 text-white outline-none focus:border-accent-blue"
+                                className="w-full placeholder:text-text-muted"
                             />
                         </div>
-                        <div className="flex gap-4 justify-end">
+                        <div className="flex gap-3 justify-end">
                             <button className="btn btn-outline" onClick={() => setIsAddingCategory(false)}>Cancelar</button>
                             <button className="btn btn-primary" onClick={() => {
                                 if (newCategoryName.trim()) { addCategory(newCategoryName.trim()); addToast("Sección añadida", "success"); setIsAddingCategory(false); setSelectedCategory(newCategoryName.trim()); }
                                 else addToast("El nombre no puede estar vacío", "error");
-                            }}>Guardar</button>
+                            }}><Save size={16} strokeWidth={2.2} /> Guardar</button>
                         </div>
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
 };

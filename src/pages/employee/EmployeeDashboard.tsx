@@ -1,9 +1,53 @@
 import React, { useState, useEffect } from 'react';
+import {
+    Activity,
+    ArrowLeft,
+    BadgeCheck,
+    CalendarDays,
+    CheckCircle2,
+    ChevronRight,
+    ClipboardList,
+    Clock,
+    Flag,
+    FolderKanban,
+    Loader2,
+    Lock,
+    Minus,
+    Package,
+    PackageOpen,
+    Pencil,
+    Plus,
+    RotateCcw,
+    Save,
+    Sparkles,
+    Store,
+    Trash2,
+    X,
+    XCircle,
+} from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { PreparationLog } from './PreparationLog';
 import { ConsumptionLog } from './ConsumptionLog';
 import { EmployeeCalendar } from './EmployeeCalendar';
+
+// Purely presentational: status → badge (icon + label)
+const renderStatusBadge = (status: string) => {
+    switch (status) {
+        case 'PENDING_PEDIDO':
+            return <span className="badge badge-gray gap-1.5"><Clock size={11} strokeWidth={2.4} /> Pendiente de Aprobación</span>;
+        case 'OPEN':
+            return <span className="badge badge-green gap-1.5"><Activity size={11} strokeWidth={2.4} /> Aprobado — En Servicio</span>;
+        case 'CLOSED':
+            return <span className="badge badge-gray gap-1.5"><Lock size={11} strokeWidth={2.4} /> Finalizado</span>;
+        case 'APPROVED':
+            return <span className="badge badge-blue gap-1.5"><BadgeCheck size={11} strokeWidth={2.4} /> Aprobado por Master</span>;
+        case 'REJECTED':
+            return <span className="badge badge-red gap-1.5"><XCircle size={11} strokeWidth={2.4} /> Rechazado</span>;
+        default:
+            return <span className="badge badge-gray">{status}</span>;
+    }
+};
 
 export const EmployeeDashboard: React.FC = () => {
     const { activeLogs, historicalLogs, deleteDailyLog, events = [], products, updatePedidoItems } = useAppContext();
@@ -68,12 +112,15 @@ export const EmployeeDashboard: React.FC = () => {
             if (logForSob) {
                 return (
                     <div className="animate-fade-in">
-                        <div className="mb-4 flex items-center justify-between bg-accent-blue/10 border border-accent-blue/20 p-4 rounded-lg">
-                            <div>
-                                <span className="text-text-muted text-sm block">Registrando sobrantes de:</span>
-                                <strong className="text-accent-blue">{logForSob.eventTitle || 'Pedido General'}</strong>
+                        <div className="mb-4 flex items-center justify-between gap-3 bg-accent-blue/10 border border-accent-blue/20 p-4 rounded-xl">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <span className="icon-chip icon-chip-blue"><PackageOpen size={18} strokeWidth={2.2} /></span>
+                                <div className="min-w-0">
+                                    <span className="text-text-muted text-sm block">Registrando sobrantes de:</span>
+                                    <strong className="text-accent-blue break-words">{logForSob.eventTitle || 'Pedido General'}</strong>
+                                </div>
                             </div>
-                            <button className="btn btn-outline text-sm shrink-0" onClick={() => setSelectedLogForSobrantes(null)}>← Volver</button>
+                            <button className="btn btn-outline btn-sm shrink-0" onClick={() => setSelectedLogForSobrantes(null)}><ArrowLeft size={14} strokeWidth={2.4} /> Volver</button>
                         </div>
                         <ConsumptionLog currentLog={logForSob} onClose={() => setSelectedLogForSobrantes(null)} />
                     </div>
@@ -104,12 +151,15 @@ export const EmployeeDashboard: React.FC = () => {
             );
             return (
                 <div className="animate-fade-in">
-                    <div className="mb-4 flex items-center justify-between bg-accent-blue/10 border border-accent-blue/20 p-4 rounded-lg">
-                        <div>
-                            <span className="text-text-muted text-sm block">Cierre Total de:</span>
-                            <strong className="text-accent-blue">{casetaBase}</strong>
+                    <div className="mb-4 flex items-center justify-between gap-3 bg-accent-blue/10 border border-accent-blue/20 p-4 rounded-xl">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <span className="icon-chip icon-chip-blue"><Flag size={18} strokeWidth={2.2} /></span>
+                            <div className="min-w-0">
+                                <span className="text-text-muted text-sm block">Cierre Total de:</span>
+                                <strong className="text-accent-blue break-words">{casetaBase}</strong>
+                            </div>
                         </div>
-                        <button className="btn btn-outline text-sm shrink-0" onClick={() => setShowTotalReturn(null)}>← Volver</button>
+                        <button className="btn btn-outline btn-sm shrink-0" onClick={() => setShowTotalReturn(null)}><ArrowLeft size={14} strokeWidth={2.4} /> Volver</button>
                     </div>
                     <ConsumptionLog aggregatedLogs={feriaLogs} onClose={() => setShowTotalReturn(null)} />
                 </div>
@@ -120,12 +170,15 @@ export const EmployeeDashboard: React.FC = () => {
         if (isEditingOrder && currentLog && currentLog.status === 'PENDING_PEDIDO') {
             return (
                 <div className="card animate-fade-in">
-                    <div className="flex justify-between items-center mb-6">
-                        <div>
-                            <h2 className="text-2xl font-bold">✏️ Editar Pedido</h2>
-                            <p className="text-text-muted text-sm mt-1">{currentLog.eventTitle || 'Pedido General'} — {selectedDate}</p>
+                    <div className="flex justify-between items-center gap-3 mb-6">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <span className="icon-chip icon-chip-blue"><Pencil size={18} strokeWidth={2.2} /></span>
+                            <div className="min-w-0">
+                                <h2 className="text-2xl font-bold">Editar Pedido</h2>
+                                <p className="text-text-muted text-sm mt-1 break-words">{currentLog.eventTitle || 'Pedido General'} — {selectedDate}</p>
+                            </div>
                         </div>
-                        <button className="btn btn-outline text-sm" onClick={() => setIsEditingOrder(false)}>Cancelar</button>
+                        <button className="btn btn-outline btn-sm shrink-0" onClick={() => setIsEditingOrder(false)}><X size={14} strokeWidth={2.4} /> Cancelar</button>
                     </div>
                     <div className="animate-fade-in flex flex-col gap-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/20 p-4 rounded-lg border border-white/10">
@@ -169,19 +222,21 @@ export const EmployeeDashboard: React.FC = () => {
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold"
+                                                        aria-label={`Quitar una unidad de ${product.name}`}
+                                                        className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
                                                         onClick={() => setEditQuantities(prev => ({ ...prev, [product.id]: Math.max(0, qty - 1) }))}
-                                                    >-</button>
-                                                    <span className={`text-xl font-bold w-10 text-center ${qty > 0 ? 'text-accent-blue' : 'text-text-muted'}`}>{qty}</span>
+                                                    ><Minus size={16} strokeWidth={2.4} /></button>
+                                                    <span className={`text-xl font-bold w-10 text-center num ${qty > 0 ? 'text-accent-blue' : 'text-text-muted'}`}>{qty}</span>
                                                     <button
-                                                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-accent-blue/40 text-white flex items-center justify-center font-bold"
+                                                        aria-label={`Añadir una unidad de ${product.name}`}
+                                                        className="w-9 h-9 rounded-full bg-white/10 hover:bg-accent-blue/40 text-white flex items-center justify-center transition-colors"
                                                         onClick={() => {
                                                             if (!isOutOfStock) {
                                                                 setEditQuantities(prev => ({ ...prev, [product.id]: Math.min(availableStock, qty + 1) }));
                                                             }
                                                         }}
                                                         disabled={isOutOfStock}
-                                                    >+</button>
+                                                    ><Plus size={16} strokeWidth={2.4} /></button>
                                                 </div>
                                             </div>
                                         </div>
@@ -191,7 +246,7 @@ export const EmployeeDashboard: React.FC = () => {
                         </div>
                     </div>
                     <button
-                        className="btn btn-primary w-full py-4 text-lg flex items-center justify-center gap-2"
+                        className="btn btn-primary w-full py-4 text-lg mt-6"
                         onClick={async () => {
                             if (isSaving) return;
                             const itemsToUpdate = products
@@ -216,8 +271,8 @@ export const EmployeeDashboard: React.FC = () => {
                         }}
                         disabled={isSaving}
                     >
-                        {isSaving ? <span className="animate-spin text-lg">⏳</span> : null}
-                        {isSaving ? 'Guardando...' : '💾 Guardar Cambios'}
+                        {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} strokeWidth={2.2} />}
+                        {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
                 </div>
             );
@@ -227,18 +282,21 @@ export const EmployeeDashboard: React.FC = () => {
         if (selectedEventTitleForNew !== null) {
             return (
                 <div className="animate-fade-in">
-                    <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-accent-blue/10 border border-accent-blue/20 p-4 rounded-lg gap-3">
-                        <div className="w-full">
-                            <span className="text-text-muted text-sm block mb-1">Preparando nuevo pedido para:</span>
-                            <strong className="text-lg text-accent-blue break-words">{selectedEventTitleForNew || 'Pedido del Día'}</strong>
+                    <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-accent-blue/10 border border-accent-blue/20 p-4 rounded-xl gap-3">
+                        <div className="w-full flex items-center gap-3 min-w-0">
+                            <span className="icon-chip icon-chip-blue"><ClipboardList size={18} strokeWidth={2.2} /></span>
+                            <div className="min-w-0">
+                                <span className="text-text-muted text-sm block mb-1">Preparando nuevo pedido para:</span>
+                                <strong className="text-lg text-accent-blue break-words">{selectedEventTitleForNew || 'Pedido del Día'}</strong>
+                            </div>
                         </div>
                         <button
-                            className="btn btn-outline text-sm w-full sm:w-auto shrink-0"
+                            className="btn btn-outline btn-sm w-full sm:w-auto shrink-0"
                             onClick={() => {
                                 setSelectedEventTitleForNew(null);
                                 // If we came from a caseta panel, go back to it
                             }}
-                        >← Volver a Gestionar</button>
+                        ><ArrowLeft size={14} strokeWidth={2.4} /> Volver a Gestionar</button>
                     </div>
                     <PreparationLog
                         selectedDate={selectedDate}
@@ -252,58 +310,54 @@ export const EmployeeDashboard: React.FC = () => {
         // --- CASETA GESTIONAR PANEL ---
         if (selectedCaseta !== null) {
             const casetaLogs = logsForDate.filter(l => l.eventTitle === selectedCaseta);
-            const statusLabel: Record<string, string> = {
-                PENDING_PEDIDO: '⏳ Pendiente de Aprobación',
-                OPEN: '🟢 Aprobado — En Servicio',
-                CLOSED: '🔒 Finalizado',
-                APPROVED: '✅ Aprobado por Master',
-                REJECTED: '❌ Rechazado',
-            };
             const extraCount = casetaLogs.filter(l => l.eventTitle?.includes('Extra')).length;
             return (
                 <div className="animate-fade-in">
                     <div className="card mb-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-2xl font-bold mb-0.5">🗂 Gestionar</h2>
-                                <p className="text-accent-blue font-semibold">{selectedCaseta}</p>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <span className="icon-chip icon-chip-blue"><FolderKanban size={18} strokeWidth={2.2} /></span>
+                                <div className="min-w-0">
+                                    <h2 className="text-2xl font-bold mb-0.5">Gestionar</h2>
+                                    <p className="text-accent-blue font-semibold break-words">{selectedCaseta}</p>
+                                </div>
                             </div>
-                            <button className="btn btn-outline text-sm shrink-0" onClick={() => setSelectedCaseta(null)}>← Volver</button>
+                            <button className="btn btn-outline btn-sm shrink-0" onClick={() => setSelectedCaseta(null)}><ArrowLeft size={14} strokeWidth={2.4} /> Volver</button>
                         </div>
                     </div>
 
                     {casetaLogs.length > 0 && (
                         <div className="mb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3 px-1">Pedidos de esta Caseta</h3>
+                            <h3 className="section-label mb-3 px-1">Pedidos de esta Caseta</h3>
                             <div className="flex flex-col gap-3">
                                 {casetaLogs.map(log => (
                                     <div key={log.id} className="card p-4 border border-white/10">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                             <div>
                                                 <div className="font-bold">{log.eventTitle}</div>
-                                                <div className="text-sm text-text-muted mt-0.5">{statusLabel[log.status] || log.status}</div>
+                                                <div className="mt-1.5">{renderStatusBadge(log.status)}</div>
                                             </div>
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2 flex-wrap sm:shrink-0">
                                                 {log.status === 'PENDING_PEDIDO' && (
-                                                    <button className="btn btn-outline text-sm" onClick={() => {
+                                                    <button className="btn btn-outline btn-sm" onClick={() => {
                                                         const initQ: Record<string, number> = {};
                                                         log.items.forEach(i => { initQ[i.product.id] = i.prepared; });
                                                         setEditQuantities(initQ);
                                                         setSelectedLogId(log.id);
                                                         setIsEditingOrder(true);
-                                                    }}>✏️ Editar</button>
+                                                    }}><Pencil size={14} strokeWidth={2.4} /> Editar</button>
                                                 )}
                                                 {(log.status === 'OPEN' || log.status === 'CLOSED' || log.status === 'APPROVED') && (
                                                     <button
-                                                        className={`btn btn-outline text-sm ${log.status === 'APPROVED' ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
+                                                        className={`btn btn-outline btn-sm ${log.status === 'APPROVED' ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
                                                         onClick={() => setSelectedLogForSobrantes(log.id)}
                                                         title={log.status === 'APPROVED' ? 'Ajustar sobrantes en un pedido ya aprobado' : 'Registrar sobrantes'}
                                                     >
-                                                        📦 {log.status === 'APPROVED' ? 'Ajustar Sobrantes' : 'Sobrantes'}
+                                                        <Package size={14} strokeWidth={2.4} /> {log.status === 'APPROVED' ? 'Ajustar Sobrantes' : 'Sobrantes'}
                                                     </button>
                                                 )}
                                                 {log.status === 'REJECTED' && (
-                                                    <button className="btn btn-outline border-accent-red text-accent-red text-sm" onClick={() => deleteDailyLog(log.id)}>🗑 Descartar</button>
+                                                    <button className="btn btn-outline btn-sm border-accent-red text-accent-red" onClick={() => deleteDailyLog(log.id)}><Trash2 size={14} strokeWidth={2.4} /> Descartar</button>
                                                 )}
                                             </div>
                                         </div>
@@ -318,13 +372,13 @@ export const EmployeeDashboard: React.FC = () => {
                             className="btn btn-primary py-4 text-base w-full"
                             onClick={() => setSelectedEventTitleForNew(selectedCaseta)}
                         >
-                            📋 Realizar Pedido
+                            <ClipboardList size={18} strokeWidth={2.2} /> Realizar Pedido
                         </button>
                         <button
                             className="btn btn-outline py-4 text-base w-full"
                             onClick={() => setSelectedEventTitleForNew(`${selectedCaseta} (Extra ${extraCount + 1})`)}
                         >
-                            ➕ Realizar Pedido Extra
+                            <Plus size={18} strokeWidth={2.2} /> Realizar Pedido Extra
                         </button>
                     </div>
                 </div>
@@ -332,13 +386,6 @@ export const EmployeeDashboard: React.FC = () => {
         }
 
         // --- GESTIONAR PANEL (always shown by default) ---
-        const statusLabel: Record<string, string> = {
-            PENDING_PEDIDO: '⏳ Pendiente de Aprobación',
-            OPEN: '🟢 Aprobado — En Servicio',
-            CLOSED: '🔒 Finalizado',
-            APPROVED: '✅ Aprobado por Master',
-            REJECTED: '❌ Rechazado',
-        };
 
         // --- NEW LOGIC: COMPLETION STATE ---
         const allLogsFinished = logsForDate.length > 0 && logsForDate.every(l => l.status === 'CLOSED' || l.status === 'APPROVED');
@@ -388,8 +435,10 @@ export const EmployeeDashboard: React.FC = () => {
         if (isFinalDay && isWorkdayFinished && !feriaHasOpenLogs) {
             return (
                 <div className="animate-fade-in text-center py-12 px-6">
-                    <div className="mb-6">
-                        <span className="text-7xl block mb-4 animate-bounce">🎊</span>
+                    <div className="mb-6 flex flex-col items-center">
+                        <span className="w-16 h-16 rounded-2xl bg-accent-blue/15 border border-accent-blue/25 text-accent-blue flex items-center justify-center mb-4">
+                            <Sparkles size={32} strokeWidth={2} />
+                        </span>
                         <h2 className="text-3xl font-bold text-accent-blue mb-2">¡Feria Finalizada con Éxito!</h2>
                         <p className="text-text-muted text-lg">{feriaNameFinalDay}</p>
                     </div>
@@ -398,22 +447,22 @@ export const EmployeeDashboard: React.FC = () => {
                             Has completado todos los pedidos y sobrantes para el último día de esta feria.
                         </p>
                         <div className="flex flex-col gap-3">
-                            <div className="flex justify-between items-center bg-black/20 p-3 rounded border border-white/5">
+                            <div className="flex justify-between items-center bg-black/20 p-3 rounded-lg border border-white/5">
                                 <span className="text-xs text-text-muted">Pedidos realizados hoy:</span>
-                                <span className="font-bold">{logsForDate.length}</span>
+                                <span className="font-bold num">{logsForDate.length}</span>
                             </div>
-                            <div className="p-3 rounded bg-accent-blue/10 text-accent-blue font-bold text-sm">
-                                ✅ Todo el stock ha sido devuelto al inventario central.
+                            <div className="p-3 rounded-lg bg-accent-blue/10 text-accent-blue font-bold text-sm flex items-center justify-center gap-2">
+                                <CheckCircle2 size={16} strokeWidth={2.4} className="shrink-0" /> Todo el stock ha sido devuelto al inventario central.
                             </div>
                         </div>
                     </div>
                     <p className="mt-8 text-text-muted text-sm italic">"Buen trabajo, equipo."</p>
                     <div className="flex justify-center mt-6">
                         <button
-                            className="btn btn-outline py-2 px-4 text-sm bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue"
+                            className="btn btn-outline btn-sm bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue"
                             onClick={() => setShowExtraModal(true)}
                         >
-                            ➕ Añadir Pedido Extra / Olvidado
+                            <Plus size={14} strokeWidth={2.4} /> Añadir Pedido Extra / Olvidado
                         </button>
                     </div>
                 </div>
@@ -424,8 +473,10 @@ export const EmployeeDashboard: React.FC = () => {
         if (isWorkdayFinished) {
             return (
                 <div className="animate-fade-in text-center py-12">
-                    <div className="mb-4">
-                        <span className="text-5xl block mb-2">✅</span>
+                    <div className="mb-4 flex flex-col items-center">
+                        <span className="empty-state-icon text-accent-green bg-accent-green/10 border-accent-green/25">
+                            <CheckCircle2 size={24} strokeWidth={2.2} />
+                        </span>
                         <h2 className="text-2xl font-bold text-text-muted">Jornada Completada</h2>
                         <p className="text-sm text-text-muted mt-1">Todos los pedidos para el {selectedDate} han sido cerrados.</p>
                     </div>
@@ -433,12 +484,12 @@ export const EmployeeDashboard: React.FC = () => {
                         <button
                             className="btn btn-outline text-sm"
                             onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-                        >Ir al día de hoy</button>
+                        ><CalendarDays size={14} strokeWidth={2.4} /> Ir al día de hoy</button>
                         <button
                             className="btn btn-outline text-sm bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue"
                             onClick={() => setShowExtraModal(true)}
                         >
-                            ➕ Añadir Pedido Extra
+                            <Plus size={14} strokeWidth={2.4} /> Añadir Pedido Extra
                         </button>
                     </div>
                 </div>
@@ -477,7 +528,7 @@ export const EmployeeDashboard: React.FC = () => {
                 {isFinalDay && (
                     <div className="mb-4 flex flex-col items-start gap-3 bg-accent-blue/10 border border-accent-blue/30 rounded-xl p-4">
                         <div className="flex items-center gap-3">
-                            <span className="text-3xl">🎪</span>
+                            <span className="icon-chip icon-chip-blue"><Flag size={18} strokeWidth={2.2} /></span>
                             <div>
                                 <div className="font-bold text-accent-blue">Último día de feria</div>
                                 <div className="text-sm text-text-muted">{feriaNameFinalDay}</div>
@@ -505,7 +556,15 @@ export const EmployeeDashboard: React.FC = () => {
                                         disabled={!hasAnyLogs}
                                         title={!hasAnyLogs ? 'Esta caseta no tiene ningún pedido en la feria' : allDone ? 'Ya cerrada — pulsa para ajustar sobrantes' : ''}
                                     >
-                                        <span className="font-semibold">{!hasAnyLogs ? '— Sin pedidos' : allDone ? '🔁 Ajustar Cierre' : '🏁 Cierre Total'}</span>
+                                        <span className="font-semibold inline-flex items-center gap-2">
+                                            {!hasAnyLogs ? (
+                                                '— Sin pedidos'
+                                            ) : allDone ? (
+                                                <><RotateCcw size={15} strokeWidth={2.4} /> Ajustar Cierre</>
+                                            ) : (
+                                                <><Flag size={15} strokeWidth={2.4} /> Cierre Total</>
+                                            )}
+                                        </span>
                                         <span className="text-sm opacity-90 truncate max-w-[60%] text-right">{casetaBase}</span>
                                     </button>
                                 );
@@ -517,11 +576,14 @@ export const EmployeeDashboard: React.FC = () => {
                 {/* Header */}
                 <div className="card mb-4">
                     <div className="flex justify-between items-start">
-                        <div>
-                            <h2 className="text-2xl font-bold mb-1">🗂 Gestionar</h2>
-                            <p className="text-text-muted text-sm">
-                                Pedidos del día <strong>{selectedDate}</strong>
-                            </p>
+                        <div className="flex items-center gap-3">
+                            <span className="icon-chip icon-chip-blue"><FolderKanban size={18} strokeWidth={2.2} /></span>
+                            <div>
+                                <h2 className="text-2xl font-bold mb-1">Gestionar</h2>
+                                <p className="text-text-muted text-sm">
+                                    Pedidos del día <strong>{selectedDate}</strong>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -529,19 +591,19 @@ export const EmployeeDashboard: React.FC = () => {
                 {/* Existing orders for the day */}
                 {logsForDate.length > 0 && (
                     <div className="mb-4">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3 px-1">Pedidos Activos</h3>
+                        <h3 className="section-label mb-3 px-1">Pedidos Activos</h3>
                         <div className="flex flex-col gap-3">
                             {logsForDate.map(log => (
                                 <div key={log.id} className="card p-4 border border-white/10">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                         <div>
                                             <div className="font-bold text-lg">{log.eventTitle || 'Pedido General'}</div>
-                                            <div className="text-sm text-text-muted mt-0.5">{statusLabel[log.status] || log.status}</div>
+                                            <div className="mt-1.5">{renderStatusBadge(log.status)}</div>
                                         </div>
                                         <div className="flex gap-2 flex-wrap sm:shrink-0">
                                             {log.status === 'PENDING_PEDIDO' && (
                                                 <button
-                                                    className="btn btn-outline text-sm"
+                                                    className="btn btn-outline btn-sm"
                                                     onClick={() => {
                                                         const initQ: Record<string, number> = {};
                                                         log.items.forEach(i => { initQ[i.product.id] = i.prepared; });
@@ -550,24 +612,24 @@ export const EmployeeDashboard: React.FC = () => {
                                                         setIsEditingOrder(true);
                                                     }}
                                                 >
-                                                    ✏️ Editar
+                                                    <Pencil size={14} strokeWidth={2.4} /> Editar
                                                 </button>
                                             )}
                                             {(log.status === 'OPEN' || log.status === 'CLOSED' || log.status === 'APPROVED') && (
                                                 <button
-                                                    className={`btn btn-outline text-sm ${log.status === 'APPROVED' ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
+                                                    className={`btn btn-outline btn-sm ${log.status === 'APPROVED' ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
                                                     onClick={() => setSelectedLogForSobrantes(log.id)}
                                                     title={log.status === 'APPROVED' ? 'Ajustar sobrantes en un pedido ya aprobado' : 'Registrar sobrantes'}
                                                 >
-                                                    📦 {log.status === 'APPROVED' ? 'Ajustar Sobrantes' : 'Sobrantes'}
+                                                    <Package size={14} strokeWidth={2.4} /> {log.status === 'APPROVED' ? 'Ajustar Sobrantes' : 'Sobrantes'}
                                                 </button>
                                             )}
                                             {log.status === 'REJECTED' && (
                                                 <button
-                                                    className="btn btn-outline border-accent-red text-accent-red text-sm"
+                                                    className="btn btn-outline btn-sm border-accent-red text-accent-red"
                                                     onClick={() => { deleteDailyLog(log.id); }}
                                                 >
-                                                    🗑 Descartar
+                                                    <Trash2 size={14} strokeWidth={2.4} /> Descartar
                                                 </button>
                                             )}
                                         </div>
@@ -605,7 +667,7 @@ export const EmployeeDashboard: React.FC = () => {
 
                     return (
                         <div className="mb-4">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3 px-1">Casetas Programadas sin Iniciar</h3>
+                            <h3 className="section-label mb-3 px-1">Casetas Programadas sin Iniciar</h3>
                             <div className="flex flex-col gap-4">
                                 {Object.entries(groupedProgrammedOrders).map(([groupName, pos]) => (
                                     <div key={groupName} className="flex flex-col gap-2">
@@ -614,14 +676,14 @@ export const EmployeeDashboard: React.FC = () => {
                                             <button
                                                 key={po.id}
                                                 onClick={() => setSelectedCaseta(po.title)}
-                                                className="p-3 border border-dashed border-accent-green/40 bg-accent-green/5 rounded-lg hover:bg-accent-green/10 flex justify-between items-center group transition-colors text-left"
+                                                className="p-3 border border-dashed border-accent-green/40 bg-accent-green/5 rounded-xl hover:bg-accent-green/10 flex justify-between items-center group transition-colors text-left"
                                             >
-                                                <div>
-                                                    <div className="font-bold text-accent-green">{po.displayName}</div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-accent-green truncate">{po.displayName}</div>
                                                     <div className="text-xs text-text-muted mt-0.5">Caseta programada</div>
                                                 </div>
-                                                <div className="text-accent-green text-xs font-bold shrink-0 bg-accent-green/10 px-3 py-1.5 rounded-md">
-                                                    Gestionar →
+                                                <div className="text-accent-green text-xs font-bold shrink-0 bg-accent-green/10 px-3 py-1.5 rounded-md inline-flex items-center gap-1">
+                                                    Gestionar <ChevronRight size={13} strokeWidth={2.4} />
                                                 </div>
                                             </button>
                                         ))}
@@ -639,13 +701,13 @@ export const EmployeeDashboard: React.FC = () => {
                             className="btn btn-primary py-4 text-base w-full"
                             onClick={() => setSelectedEventTitleForNew('')}
                         >
-                            📋 Realizar Pedido
+                            <ClipboardList size={18} strokeWidth={2.2} /> Realizar Pedido
                         </button>
                         <button
                             className="btn btn-outline py-4 text-base w-full"
                             onClick={() => setShowExtraModal(true)}
                         >
-                            ➕ Realizar Pedido Extra
+                            <Plus size={18} strokeWidth={2.2} /> Realizar Pedido Extra
                         </button>
                     </div>
                 )}
@@ -688,26 +750,27 @@ export const EmployeeDashboard: React.FC = () => {
         };
 
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowExtraModal(false)}>
-                {/* Backdrop */}
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-
+            <div className="modal-overlay" onClick={() => setShowExtraModal(false)}>
                 {/* Modal */}
                 <div
-                    className="relative z-10 w-full max-w-md bg-bg-primary border border-white/10 rounded-2xl shadow-2xl shadow-black/60 animate-fade-in"
+                    className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-bg-primary border border-white/10 rounded-2xl shadow-2xl shadow-black/60"
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
                     <div className="p-6 border-b border-white/10">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-xl font-bold">➕ Pedido Extra</h2>
-                                <p className="text-text-muted text-sm mt-0.5">¿Para qué caseta es este pedido?</p>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <span className="icon-chip icon-chip-blue"><Plus size={18} strokeWidth={2.2} /></span>
+                                <div>
+                                    <h2 className="text-xl font-bold">Pedido Extra</h2>
+                                    <p className="text-text-muted text-sm mt-0.5">¿Para qué caseta es este pedido?</p>
+                                </div>
                             </div>
                             <button
-                                className="text-text-muted hover:text-white transition-colors p-1"
+                                aria-label="Cerrar"
+                                className="text-text-muted hover:text-white transition-colors p-1 shrink-0"
                                 onClick={() => setShowExtraModal(false)}
-                            >✕</button>
+                            ><X size={18} strokeWidth={2.4} /></button>
                         </div>
                     </div>
 
@@ -756,14 +819,17 @@ export const EmployeeDashboard: React.FC = () => {
                                                         <div className="text-xs text-text-muted mt-0.5">{existingExtras} extra{existingExtras > 1 ? 's' : ''} ya realizados</div>
                                                     )}
                                                 </div>
-                                                <span className="text-accent-blue text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Seleccionar →</span>
+                                                <span className="text-accent-blue text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap inline-flex items-center gap-1">Seleccionar <ChevronRight size={14} strokeWidth={2.4} /></span>
                                             </button>
                                         );
                                     })}
                                 </div>
                             ));
                         })() : (
-                            <p className="text-text-muted text-sm text-center py-4">No hay casetas programadas para este día.</p>
+                            <div className="empty-state py-6">
+                                <span className="empty-state-icon"><Store size={20} strokeWidth={2} /></span>
+                                <p className="text-sm">No hay casetas programadas para este día.</p>
+                            </div>
                         )}
                     </div>
 
@@ -775,10 +841,10 @@ export const EmployeeDashboard: React.FC = () => {
                             <div className="flex-1 h-px bg-white/10" />
                         </div>
                         <button
-                            className="w-full p-3 rounded-xl border border-dashed border-white/20 hover:border-white/40 text-text-muted hover:text-white transition-all text-sm"
+                            className="w-full p-3 rounded-xl border border-dashed border-white/20 hover:border-white/40 text-text-muted hover:text-white transition-all text-sm inline-flex items-center justify-center gap-2"
                             onClick={() => handleSelectCaseta(null)}
                         >
-                            📦 Pedido Extra General (sin caseta específica)
+                            <Package size={16} strokeWidth={2.2} className="shrink-0" /> Pedido Extra General (sin caseta específica)
                         </button>
                     </div>
                 </div>

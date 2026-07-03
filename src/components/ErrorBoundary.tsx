@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
+import { RefreshCw, RotateCcw, TriangleAlert } from 'lucide-react';
 
 interface Props {
   children?: ReactNode;
@@ -58,30 +59,33 @@ class ErrorBoundary extends Component<Props, State> {
       if (isChunkError) {
         // Pantalla de actualización - se recargará sola
         return (
-          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
-            <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-blue-500/30">
-              <div className="text-5xl mb-4 animate-spin">🔄</div>
-              <h1 className="text-2xl font-bold text-slate-100 mb-4">Actualizando...</h1>
-              <p className="text-slate-400 text-sm">Hay una nueva versión disponible. Cargando...</p>
+          <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">
+            <div className="card p-8 max-w-md w-full animate-fade-in">
+              <div className="icon-chip icon-chip-blue mx-auto mb-5">
+                <RefreshCw size={18} strokeWidth={2.2} className="animate-spin" />
+              </div>
+              <h1 className="text-2xl font-bold text-text-primary tracking-tight mb-3">Actualizando...</h1>
+              <p className="text-text-muted text-sm leading-relaxed">Hay una nueva versión disponible. Cargando...</p>
             </div>
           </div>
         );
       }
 
       return (
-        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
-          <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-red-500/30">
-            <svg className="w-16 h-16 mx-auto mb-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-            <h1 className="text-2xl font-bold text-slate-100 mb-4 tracking-tight">Vaya, algo ha fallado</h1>
-            <p className="text-slate-400 mb-6 text-sm">
+        <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 text-center">
+          <div className="card p-8 max-w-md w-full animate-fade-in">
+            <div className="icon-chip icon-chip-red mx-auto mb-5">
+              <TriangleAlert size={18} strokeWidth={2.2} />
+            </div>
+            <h1 className="text-2xl font-bold text-text-primary mb-3 tracking-tight">Vaya, algo ha fallado</h1>
+            <p className="text-text-muted mb-6 text-sm leading-relaxed">
               Nuestros escudos de protección han interceptado un error inesperado.
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-indigo-500/25 active:scale-[0.98]"
+              className="btn btn-primary w-full py-3"
             >
+              <RotateCcw size={16} strokeWidth={2.2} />
               Reiniciar Aplicación
             </button>
           </div>
