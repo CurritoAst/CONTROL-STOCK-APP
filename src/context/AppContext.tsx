@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppState, Role, Product, DailyLog, InventoryItem, EventType, BackupSnapshot, BackupTrigger } from '../types';
-import { supabase, fetchAll } from '../lib/supabaseClient';
+import { supabase, fetchAll, applyStockDeltas } from '../lib/supabaseClient';
 import { createClient } from '@supabase/supabase-js';
 import { useToast } from './ToastContext';
 
@@ -382,13 +382,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { data: currentLogStatus } = await supabase.from('daily_logs').select('status').eq('id', id).single();
         if (currentLogStatus?.status !== 'PENDING_PEDIDO') return;
 
-        // Decrease stock using CURRENT values from DB, not stale state
+        // Decrease stock using CURRENT values from DB, not stale state.
+        // Batched: 2 requests total instead of 2 per product.
+        const approveDeltas: Record<string, number> = {};
         for (const item of log.items) {
-            const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', item.product.id).single();
-            const currentStock = freshProduct?.stock ?? item.product.stock;
-            const newStock = Math.max(0, currentStock - item.prepared);
-            await supabase.from('products').update({ stock: newStock }).eq('id', item.product.id);
+            approveDeltas[item.product.id] = (approveDeltas[item.product.id] ?? 0) - item.prepared;
         }
+        await applyStockDeltas(approveDeltas);
 
         const { error } = await supabase.from('daily_logs').update({ status: 'OPEN' }).eq('id', id);
         if (error) throw error;
@@ -426,14 +426,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { error: logError } = await supabase.from('daily_logs').update({ status: targetStatus }).eq('id', id);
         if (logError) throw logError;
 
+        // Batched save: one read of the log's item row-ids, one upsert with all
+        // the new consumed values, and one batched stock write. The previous
+        // per-item sequential loop issued ~3 requests per product (a 90-item
+        // pedido = ~270 round-trips), which on feria mobile connections took
+        // minutes and left half-saved stock when users gave up mid-save.
+        const { data: dbItems, error: itemsFetchError } = await supabase
+            .from('log_items')
+            .select('id, product_id')
+            .eq('daily_log_id', id);
+        if (itemsFetchError) throw itemsFetchError;
+        const rowIdByProduct = new Map((dbItems ?? []).map((r: any) => [r.product_id, r.id]));
+
+        const rowsToUpsert: any[] = [];
+        const stockDeltas: Record<string, number> = {};
+
         for (const item of itemsWithConsumption) {
             const oldItem = currentLog.items.find(i => i.product.id === item.product.id);
             const oldConsumed = oldItem?.consumed || 0;
 
-            // update consumed in DB
-            await supabase.from('log_items').update({ consumed: item.consumed })
-                .eq('daily_log_id', id)
-                .eq('product_id', item.product.id);
+            // Only rows that already exist in the DB get their consumed updated
+            // (same semantics as the previous keyed .update(), which no-ops on
+            // missing rows).
+            const rowId = rowIdByProduct.get(item.product.id);
+            if (rowId) {
+                rowsToUpsert.push({
+                    id: rowId,
+                    daily_log_id: id,
+                    product_id: item.product.id,
+                    consumed: item.consumed
+                });
+            }
 
             let stockAdjustment = 0;
 
@@ -452,12 +475,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
 
             if (stockAdjustment !== 0) {
-                const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', item.product.id).single();
-                const currentStock = freshProduct?.stock ?? item.product.stock;
-                const newStock = Math.max(0, currentStock + stockAdjustment);
-                await supabase.from('products').update({ stock: newStock }).eq('id', item.product.id);
+                stockDeltas[item.product.id] = (stockDeltas[item.product.id] ?? 0) + stockAdjustment;
             }
         }
+
+        if (rowsToUpsert.length > 0) {
+            const { error: upsertError } = await supabase.from('log_items').upsert(rowsToUpsert);
+            if (upsertError) throw upsertError;
+        }
+        await applyStockDeltas(stockDeltas);
         await refreshData();
     };
 
@@ -491,24 +517,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const isAlreadyDiscounted = currentLog?.status === 'OPEN' || currentLog?.status === 'CLOSED' || currentLog?.status === 'APPROVED';
 
         if (isAlreadyDiscounted) {
+            // Batched: accumulate every delta and write once (2 requests total).
+            // Reads fresh stock from DB instead of the possibly-stale state copy.
+            const deltas: Record<string, number> = {};
+
             for (const newItem of itemsToUpdate) {
                 const oldItem = currentLog.items.find(i => i.product.id === newItem.product.id);
                 const oldQuantity = oldItem ? oldItem.prepared : 0;
                 const difference = newItem.prepared - oldQuantity;
-
                 if (difference !== 0) {
-                    const newStock = Math.max(0, newItem.product.stock - difference);
-                    await supabase.from('products').update({ stock: newStock }).eq('id', newItem.product.id);
+                    deltas[newItem.product.id] = (deltas[newItem.product.id] ?? 0) - difference;
                 }
             }
 
             for (const oldItem of currentLog.items) {
                 const stillExists = itemsToUpdate.find(i => i.product.id === oldItem.product.id);
                 if (!stillExists && oldItem.prepared > 0) {
-                    const newStock = oldItem.product.stock + oldItem.prepared;
-                    await supabase.from('products').update({ stock: newStock }).eq('id', oldItem.product.id);
+                    deltas[oldItem.product.id] = (deltas[oldItem.product.id] ?? 0) + oldItem.prepared;
                 }
             }
+
+            await applyStockDeltas(deltas);
         }
 
         // First delete all existing items for this log
@@ -581,14 +610,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             toRestore[item.product_id] = (toRestore[item.product_id] || 0) + item.prepared;
         }
 
-        let fixed = 0;
-        for (const [productId, amount] of Object.entries(toRestore)) {
-            const { data: fresh } = await supabase.from('products').select('stock').eq('id', productId).single();
-            if (fresh) {
-                await supabase.from('products').update({ stock: fresh.stock + amount }).eq('id', productId);
-                fixed++;
-            }
-        }
+        const fixed = await applyStockDeltas(toRestore);
 
         await refreshData();
         return fixed;
@@ -616,6 +638,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         //   at close). Use consumed delta.
         // - NEW items added retroactively: subtract the FULL prepared (consumed +
         //   sobrante) since the sobrante hasn't been returned to the warehouse.
+        // Batched: accumulate every stock delta and write once (2 requests).
+        const editDeltas: Record<string, number> = {};
+
         for (const newItem of newItems) {
             const oldItem = currentLog.items.find(i => i.product.id === newItem.product.id);
             let stockDelta = 0;
@@ -627,10 +652,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
 
             if (stockDelta !== 0) {
-                const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', newItem.product.id).single();
-                const currentStock = freshProduct?.stock ?? newItem.product.stock;
-                const newStock = Math.max(0, currentStock + stockDelta);
-                await supabase.from('products').update({ stock: newStock }).eq('id', newItem.product.id);
+                editDeltas[newItem.product.id] = (editDeltas[newItem.product.id] ?? 0) + stockDelta;
             }
         }
 
@@ -638,11 +660,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         for (const oldItem of currentLog.items) {
             const stillExists = newItems.find(i => i.product.id === oldItem.product.id);
             if (!stillExists && oldItem.consumed > 0) {
-                const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', oldItem.product.id).single();
-                const currentStock = freshProduct?.stock ?? oldItem.product.stock;
-                await supabase.from('products').update({ stock: currentStock + oldItem.consumed }).eq('id', oldItem.product.id);
+                editDeltas[oldItem.product.id] = (editDeltas[oldItem.product.id] ?? 0) + oldItem.consumed;
             }
         }
+
+        await applyStockDeltas(editDeltas);
 
         const { error: deleteError } = await supabase.from('log_items').delete().eq('daily_log_id', logId);
         if (deleteError) throw deleteError;
@@ -773,11 +795,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
         }
 
+        // Batched: one read + one write for every adjustment (2 requests).
+        const totalDeltas: Record<string, number> = {};
         for (const adj of stockAdjustments) {
-            const { data: freshProduct } = await supabase.from('products').select('stock').eq('id', adj.productId).single();
-            const currentStock = freshProduct?.stock ?? adj.product.stock;
-            await supabase.from('products').update({ stock: Math.max(0, currentStock + adj.delta) }).eq('id', adj.productId);
+            totalDeltas[adj.productId] = (totalDeltas[adj.productId] ?? 0) + adj.delta;
         }
+        await applyStockDeltas(totalDeltas);
 
         // Persist every changed log: wipe and re-insert its items.
         for (const log of working) {

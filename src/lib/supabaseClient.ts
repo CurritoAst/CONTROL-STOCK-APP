@@ -62,7 +62,14 @@ export async function fetchAll<T = any>(
     const all: T[] = [];
     for (let from = 0; ; from += PAGE) {
         let q = supabase.from(table).select(options.select || '*');
-        if (options.orderBy) q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? false });
+        // Paginating without a stable ORDER BY lets Postgres return rows in any
+        // order per page, which can duplicate or drop rows across page
+        // boundaries once a table exceeds PAGE rows. Default to ordering by id.
+        if (options.orderBy) {
+            q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? false });
+        } else {
+            q = q.order('id', { ascending: true });
+        }
         if (options.customise) q = options.customise(q);
         q = q.range(from, from + PAGE - 1);
         const { data, error } = await q;
@@ -72,5 +79,37 @@ export async function fetchAll<T = any>(
         if (data.length < PAGE) break;
     }
     return all;
+}
+
+/**
+ * Applies many stock changes in O(1) requests instead of 2 per product.
+ *
+ * Reads the affected products fresh from the DB (avoids stale-state races),
+ * applies each delta clamped at zero, and writes everything back with a single
+ * upsert per 100-product chunk. Sequential per-product select+update loops
+ * take 30-90s on mobile connections for large pedidos and leave half-saved
+ * stock when the user gives up mid-save; this makes the same operation 2
+ * requests.
+ *
+ * Returns the number of products actually updated.
+ */
+export async function applyStockDeltas(deltas: Record<string, number>): Promise<number> {
+    const ids = Object.keys(deltas).filter(id => deltas[id] !== 0);
+    if (ids.length === 0) return 0;
+
+    let updated = 0;
+    const CHUNK = 100;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        const { data: rows, error } = await supabase.from('products').select('*').in('id', chunk);
+        if (error) throw error;
+        const patched = (rows ?? []).map((r: any) => ({ ...r, stock: Math.max(0, (r.stock ?? 0) + deltas[r.id]) }));
+        if (patched.length > 0) {
+            const { error: upErr } = await supabase.from('products').upsert(patched);
+            if (upErr) throw upErr;
+            updated += patched.length;
+        }
+    }
+    return updated;
 }
 
