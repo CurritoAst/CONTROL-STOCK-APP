@@ -1,34 +1,22 @@
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
-import {
-    LayoutDashboard, Store, FolderKanban, ClipboardList, Beef, CalendarDays,
-    TrendingDown, DatabaseBackup, LogOut, FileText, BarChart3,
-    Crown, ChefHat, Eye
-} from 'lucide-react';
+import { LayoutDashboard, ClipboardList, CalendarDays, Beef, LogOut, Crown, WifiOff } from 'lucide-react';
+import type { MainTab } from '../App';
 
 type TabDef = {
-    id: string;
+    id: MainTab;
     label: string;
     icon: React.ComponentType<{ size?: number | string; className?: string; strokeWidth?: number | string }>;
     shortLabel: string;
     badge?: number;
 };
 
-type SectionDef = {
-    section: string;
-    items: TabDef[];
-};
+export const Layout: React.FC<{ children: React.ReactNode; activeTab: MainTab; onTabChange: (tab: MainTab) => void }> = ({ children, activeTab, onTabChange }) => {
+    const { setRole, activeLogs, dbUnreachable } = useAppContext();
 
-export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; onTabChange?: (tab: any) => void }> = ({ children, activeTab, onTabChange }) => {
-    const { role, setRole, activeLogs } = useAppContext();
-
-    // Any active log that's not yet APPROVED needs the master's attention at
-    // some point: PENDING_PEDIDO needs an initial OK, OPEN needs sobrantes,
-    // CLOSED needs the final approval. Counting all of them makes sure newly
-    // created pedidos always raise the sidebar badge.
-    const pendingAudits = activeLogs.filter(log =>
-        log.status === 'PENDING_PEDIDO' || log.status === 'OPEN' || log.status === 'CLOSED'
-    ).length;
+    // Pedidos still in progress (sobrantes not registered yet) — the only thing
+    // that needs the admin's attention in the single-admin flow.
+    const openPedidos = activeLogs.filter(log => log.status !== 'APPROVED' && log.status !== 'REJECTED').length;
 
     const [showLogoutModal, setShowLogoutModal] = React.useState(false);
 
@@ -36,53 +24,12 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
     const confirmLogout = () => setRole(null);
     const cancelLogout = () => setShowLogoutModal(false);
 
-    const masterSections: SectionDef[] = [
-        {
-            section: 'Principal',
-            items: [
-                { id: 'PANEL', label: 'Panel Financiero', icon: LayoutDashboard, shortLabel: 'Panel' },
-                { id: 'POS', label: 'Punto de Venta', icon: Store, shortLabel: 'POS' },
-            ]
-        },
-        {
-            section: 'Operaciones',
-            items: [
-                { id: 'CREATE', label: 'Gestión Diaria', icon: FolderKanban, shortLabel: 'Gestión' },
-                { id: 'AUDIT', label: 'Pedidos Diarios', icon: ClipboardList, shortLabel: 'Pedidos', badge: pendingAudits },
-                { id: 'CATALOG', label: 'Catálogo de Productos', icon: Beef, shortLabel: 'Catálogo' },
-                { id: 'CALENDAR', label: 'Calendario', icon: CalendarDays, shortLabel: 'Calend.' },
-            ]
-        },
-        {
-            section: 'Análisis',
-            items: [
-                { id: 'ANALYTICS', label: 'Control de Pérdidas', icon: TrendingDown, shortLabel: 'Pérdidas' },
-            ]
-        },
-        {
-            section: 'Sistema',
-            items: [
-                { id: 'BACKUPS', label: 'Copias de Seguridad', icon: DatabaseBackup, shortLabel: 'Backups' },
-            ]
-        }
+    const tabs: TabDef[] = [
+        { id: 'PANEL', label: 'Panel', icon: LayoutDashboard, shortLabel: 'Panel' },
+        { id: 'PEDIDOS', label: 'Pedidos', icon: ClipboardList, shortLabel: 'Pedidos', badge: openPedidos },
+        { id: 'CALENDAR', label: 'Calendario', icon: CalendarDays, shortLabel: 'Calendario' },
+        { id: 'CATALOG', label: 'Productos', icon: Beef, shortLabel: 'Productos' },
     ];
-
-    const employeeSections: SectionDef[] = [
-        {
-            section: 'Operaciones',
-            items: [
-                { id: 'PEDIDO', label: 'Pedido del Día', icon: FileText, shortLabel: 'Pedido' },
-                { id: 'REPORTES', label: 'Reportes de Uso', icon: BarChart3, shortLabel: 'Reportes' },
-            ]
-        }
-    ];
-
-    const sections = role === 'MASTER' ? masterSections : role === 'EMPLOYEE' ? employeeSections : [];
-    const flatTabs: TabDef[] = sections.flatMap(s => s.items);
-    const crowdedNav = flatTabs.length > 5;
-
-    const roleLabel = role === 'MASTER' ? 'Master' : role === 'EMPLOYEE' ? 'Cocina' : 'Viewer';
-    const RoleIcon = role === 'MASTER' ? Crown : role === 'EMPLOYEE' ? ChefHat : Eye;
 
     return (
         <div className="flex h-screen bg-bg-primary overflow-hidden text-text-primary">
@@ -101,47 +48,43 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="status-dot status-dot-live" />
                                 <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">
-                                    <RoleIcon size={10} strokeWidth={2.5} /> {roleLabel}
+                                    <Crown size={10} strokeWidth={2.5} /> Admin
                                 </span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Nav with sections */}
-                <nav className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
-                    {sections.map(section => (
-                        <div key={section.section}>
-                            <div className="section-label px-3 mb-2">{section.section}</div>
-                            <div className="flex flex-col gap-1">
-                                {section.items.map(tab => {
-                                    const isActive = activeTab === tab.id;
-                                    const Icon = tab.icon;
-                                    return (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => onTabChange && onTabChange(tab.id)}
-                                            className={`nav-item ${isActive ? 'nav-item-active' : 'nav-item-inactive'}`}
-                                        >
-                                            <span className="flex items-center gap-3 min-w-0">
-                                                <Icon
-                                                    size={17}
-                                                    strokeWidth={isActive ? 2.4 : 2}
-                                                    className={`shrink-0 transition-colors ${isActive ? 'text-accent-blue' : 'text-text-muted'}`}
-                                                />
-                                                <span className="truncate">{tab.label}</span>
-                                            </span>
-                                            {(tab.badge || 0) > 0 && (
-                                                <span className="bg-accent-red/90 text-white text-[10px] font-black px-1.5 min-w-5 h-5 flex items-center justify-center rounded-md shadow-sm">
-                                                    {tab.badge}
-                                                </span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    ))}
+                {/* Nav */}
+                <nav className="flex-1 overflow-y-auto px-4 py-5">
+                    <div className="section-label px-3 mb-2">Menú</div>
+                    <div className="flex flex-col gap-1">
+                        {tabs.map(tab => {
+                            const isActive = activeTab === tab.id;
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => onTabChange(tab.id)}
+                                    className={`nav-item ${isActive ? 'nav-item-active' : 'nav-item-inactive'}`}
+                                >
+                                    <span className="flex items-center gap-3 min-w-0">
+                                        <Icon
+                                            size={18}
+                                            strokeWidth={isActive ? 2.4 : 2}
+                                            className={`shrink-0 transition-colors ${isActive ? 'text-accent-blue' : 'text-text-muted'}`}
+                                        />
+                                        <span className="truncate text-base">{tab.label}</span>
+                                    </span>
+                                    {(tab.badge || 0) > 0 && (
+                                        <span className="bg-accent-red/90 text-white text-[10px] font-black px-1.5 min-w-5 h-5 flex items-center justify-center rounded-md shadow-sm">
+                                            {tab.badge}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </nav>
 
                 {/* Footer: logout */}
@@ -171,7 +114,7 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="status-dot status-dot-live" />
                                 <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">
-                                    <RoleIcon size={10} strokeWidth={2.5} /> {roleLabel}
+                                    <Crown size={10} strokeWidth={2.5} /> Admin
                                 </span>
                             </div>
                         </div>
@@ -186,6 +129,17 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
                     </button>
                 </header>
 
+                {/* Backend unreachable banner */}
+                {dbUnreachable && (
+                    <div role="alert" className="shrink-0 flex items-center gap-3 px-4 py-2.5 bg-accent-red/15 border-b border-accent-red/30 text-sm">
+                        <span className="icon-chip icon-chip-red w-8 h-8 rounded-lg"><WifiOff size={15} strokeWidth={2.4} /></span>
+                        <div className="min-w-0">
+                            <div className="font-bold text-accent-red leading-tight">Sin conexión con la base de datos</div>
+                            <div className="text-xs text-text-muted">Los datos que ves pueden estar incompletos. Reintentando automáticamente cada 30 s…</div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Scrollable Content */}
                 <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-32 md:pb-8">
                     <div className="max-w-6xl mx-auto w-full animate-fade-in">
@@ -193,28 +147,27 @@ export const Layout: React.FC<{ children: React.ReactNode; activeTab?: string; o
                     </div>
                 </main>
 
-                {/* ─── Mobile Bottom Nav ─── */}
+                {/* ─── Mobile Bottom Nav (4 items — fits any phone) ─── */}
                 <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-bg-secondary/85 backdrop-blur-2xl border-t border-white/5 shadow-[0_-20px_40px_-10px_rgba(0,0,0,0.6)]">
-                    <div className={`flex items-stretch px-1 pt-2 pb-safe pb-3 ${crowdedNav ? 'overflow-x-auto snap-x [-webkit-overflow-scrolling:touch]' : 'justify-around'}`}>
-                        {flatTabs.map(tab => {
+                    <div className="flex items-stretch justify-around px-1 pt-2 pb-safe pb-3">
+                        {tabs.map(tab => {
                             const isActive = activeTab === tab.id;
                             const Icon = tab.icon;
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => onTabChange && onTabChange(tab.id)}
-                                    className={`flex flex-col items-center justify-center gap-1 relative py-1.5 ${crowdedNav ? 'shrink-0 min-w-[68px] snap-start' : 'flex-1 min-w-0'}`}
+                                    onClick={() => onTabChange(tab.id)}
+                                    className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 relative py-1.5 min-h-[52px]"
                                 >
-                                    {/* Active indicator */}
                                     {isActive && (
                                         <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-accent-blue to-accent-green rounded-full" />
                                     )}
                                     <Icon
-                                        size={19}
+                                        size={21}
                                         strokeWidth={isActive ? 2.4 : 2}
                                         className={`transition-all ${isActive ? 'text-accent-blue scale-110' : 'text-text-muted opacity-70'}`}
                                     />
-                                    <div className={`text-[9px] font-bold uppercase tracking-tight truncate max-w-full px-1 ${isActive ? 'text-accent-blue' : 'text-text-muted'}`}>
+                                    <div className={`text-[10px] font-bold uppercase tracking-tight truncate max-w-full px-1 ${isActive ? 'text-accent-blue' : 'text-text-muted'}`}>
                                         {tab.shortLabel}
                                     </div>
                                     {(tab.badge || 0) > 0 && (

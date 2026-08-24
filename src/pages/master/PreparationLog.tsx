@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { InventoryItem } from '../../types';
-import { Utensils, Search, X, Loader2, Minus, Plus, Send, AlertTriangle, XCircle, Ban, PackageOpen } from 'lucide-react';
+import { ClipboardCheck, Search, X, Loader2, Minus, Plus, AlertTriangle, XCircle, Ban, PackageOpen, ClipboardList } from 'lucide-react';
 
 export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: string, onLogCreated?: () => void }> = ({ selectedDate, eventTitle, onLogCreated }) => {
     const { products, openDailyLog } = useAppContext();
@@ -43,11 +43,11 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
         try {
             await openDailyLog(selectedDate, items, eventTitle);
 
-            addToast(`✅ Pedido del ${selectedDate} guardado. Lo encontrarás en "Pedidos Diarios" (badge rojo en la barra lateral).`, 'success');
+            addToast('Pedido creado. El stock se ha descontado del almacén.', 'success');
             if (onLogCreated) onLogCreated();
         } catch (error) {
             console.error("Error creating log:", error);
-            addToast('Error al enviar el pedido', 'error');
+            addToast('Error al crear el pedido', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -60,13 +60,14 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
                         <span className="icon-chip icon-chip-blue mt-0.5">
-                            <Utensils size={18} strokeWidth={2.2} />
+                            <ClipboardList size={18} strokeWidth={2.2} />
                         </span>
                         <div className="min-w-0">
-                            <h2 className="text-2xl font-bold mb-0.5">Pedido del Día</h2>
+                            <h2 className="text-2xl font-bold mb-0.5">Nuevo Pedido</h2>
                             <p className="text-text-muted text-sm">
                                 {eventTitle ? <span className="text-accent-blue font-semibold">{eventTitle}</span> : 'Pedido General'} &mdash; <strong>{selectedDate}</strong>
                             </p>
+                            <p className="text-xs text-text-muted mt-1">Al crearlo, las unidades se descuentan del almacén al instante.</p>
                         </div>
                     </div>
                     {/* Search + Category filter */}
@@ -216,8 +217,8 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
                         onClick={handleStartDay}
                         disabled={selectedItems.length === 0 || isSaving}
                     >
-                        {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} strokeWidth={2.2} />}
-                        {isSaving ? 'Enviando...' : 'Enviar Pedido'}
+                        {isSaving ? <Loader2 size={18} className="animate-spin" /> : <ClipboardCheck size={18} strokeWidth={2.2} />}
+                        {isSaving ? 'Creando...' : 'Crear pedido'}
                     </button>
                 </div>
             </div>

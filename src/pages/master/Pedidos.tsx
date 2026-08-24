@@ -7,16 +7,18 @@ import {
     CheckCircle2,
     ChevronRight,
     ClipboardList,
-    Clock,
+    Copy,
+    Download,
     Flag,
     FolderKanban,
+    Link2,
     Loader2,
-    Lock,
     Minus,
     Package,
     PackageOpen,
     Pencil,
     Plus,
+    Printer,
     RotateCcw,
     Save,
     Sparkles,
@@ -27,32 +29,66 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
+import { DailyLog } from '../../types';
+import { printRawOrder, downloadRawOrder } from '../../lib/printUtils';
 import { PreparationLog } from './PreparationLog';
 import { ConsumptionLog } from './ConsumptionLog';
-import { EmployeeCalendar } from './EmployeeCalendar';
+import { PedidosCalendar } from './PedidosCalendar';
+
+// Status semantics in the single-admin flow:
+//   OPEN (and legacy PENDING_PEDIDO) → "En curso": stock discounted, waiting for sobrantes.
+//   APPROVED (and legacy CLOSED)     → "Cerrado": sobrantes recorded, visible in the financial panel.
+//   REJECTED (legacy)                → "Descartado": only deletable.
+const isInProgress = (s: DailyLog['status']) => s === 'OPEN' || s === 'PENDING_PEDIDO';
+const isClosedStatus = (s: DailyLog['status']) => s === 'CLOSED' || s === 'APPROVED';
 
 // Purely presentational: status → badge (icon + label)
 const renderStatusBadge = (status: string) => {
     switch (status) {
         case 'PENDING_PEDIDO':
-            return <span className="badge badge-gray gap-1.5"><Clock size={11} strokeWidth={2.4} /> Pendiente de Aprobación</span>;
         case 'OPEN':
-            return <span className="badge badge-green gap-1.5"><Activity size={11} strokeWidth={2.4} /> Aprobado — En Servicio</span>;
+            return <span className="badge badge-green gap-1.5"><Activity size={11} strokeWidth={2.4} /> En curso</span>;
         case 'CLOSED':
-            return <span className="badge badge-gray gap-1.5"><Lock size={11} strokeWidth={2.4} /> Finalizado</span>;
         case 'APPROVED':
-            return <span className="badge badge-blue gap-1.5"><BadgeCheck size={11} strokeWidth={2.4} /> Aprobado por Master</span>;
+            return <span className="badge badge-blue gap-1.5"><BadgeCheck size={11} strokeWidth={2.4} /> Cerrado</span>;
         case 'REJECTED':
-            return <span className="badge badge-red gap-1.5"><XCircle size={11} strokeWidth={2.4} /> Rechazado</span>;
+            return <span className="badge badge-red gap-1.5"><XCircle size={11} strokeWidth={2.4} /> Descartado</span>;
         default:
             return <span className="badge badge-gray">{status}</span>;
     }
 };
 
-export const EmployeeDashboard: React.FC = () => {
-    const { activeLogs, historicalLogs, deleteDailyLog, events = [], products, updatePedidoItems } = useAppContext();
+// A pedido only enters a feria's Cierre Total / invoice when its eventTitle is
+// a caseta title ("Pedido <Feria> - Caseta: <Caseta>" [+ " (Extra N)"]). Logs
+// with no title, or extras that never got a caseta, are "orphans" and can be
+// re-linked from the card via assignExtraToFeria.
+const CASETA_EXTRA_RE = / - Caseta: .+ \(Extra \d+\)$/;
+const isOrphanLog = (log: DailyLog) =>
+    !log.eventTitle || (/extra/i.test(log.eventTitle) && !CASETA_EXTRA_RE.test(log.eventTitle));
+
+// Local-time date helpers (same as FeriaCalendar). Never toISOString().slice —
+// it shifts the day by the timezone offset around midnight.
+const pad = (n: number) => String(n).padStart(2, '0');
+const toDateStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayStr = () => toDateStr(new Date());
+const nextDayStr = (s: string) => {
+    const [y, m, d] = s.split('-').map(Number);
+    return toDateStr(new Date(y, m - 1, d + 1));
+};
+
+export const Pedidos: React.FC = () => {
+    const {
+        activeLogs,
+        historicalLogs,
+        deleteDailyLog,
+        duplicateDailyLog,
+        assignExtraToFeria,
+        events = [],
+        products,
+        updatePedidoItems,
+    } = useAppContext();
     const { addToast } = useToast();
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState(todayStr);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [isEditingOrder, setIsEditingOrder] = useState(false);
     const [editQuantities, setEditQuantities] = useState<Record<string, number>>({});
@@ -72,6 +108,16 @@ export const EmployeeDashboard: React.FC = () => {
     // Modal to choose caseta (or general) when creating a pedido on a day with casetas programadas
     const [showNewPedidoModal, setShowNewPedidoModal] = useState(false);
 
+    // Per-card actions: duplicate modal, "asociar a feria" inline block, delete in flight
+    const [duplicateLogId, setDuplicateLogId] = useState<string | null>(null);
+    const [duplicateDate, setDuplicateDate] = useState('');
+    const [isDuplicating, setIsDuplicating] = useState(false);
+    const [associateLogId, setAssociateLogId] = useState<string | null>(null);
+    const [assocFeria, setAssocFeria] = useState('');
+    const [assocCaseta, setAssocCaseta] = useState('');
+    const [isAssociating, setIsAssociating] = useState(false);
+    const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+
     // Reset selection when date changes
     useEffect(() => {
         setSelectedLogId(null);
@@ -81,6 +127,8 @@ export const EmployeeDashboard: React.FC = () => {
         setShowTotalReturn(null);
         setShowExtraModal(false);
         setShowNewPedidoModal(false);
+        setDuplicateLogId(null);
+        setAssociateLogId(null);
     }, [selectedDate]);
 
     const allLogs = [...activeLogs, ...historicalLogs];
@@ -107,6 +155,265 @@ export const EmployeeDashboard: React.FC = () => {
         }
     }
 
+    // --- Options for "Asociar a feria": ferias = unique EVENT titles; casetas
+    // parsed from ORDER titles ("Pedido <Feria> - Caseta: <Caseta>").
+    const feriaOptions = Array.from(new Set(events.filter(e => e.type === 'EVENT').map(e => e.title))).sort();
+    const casetaOptionsFor = (feria: string) => Array.from(new Set(
+        events
+            .filter(e => e.type === 'ORDER')
+            .map(e => e.title.replace(/^Pedido /, ''))
+            .filter(t => t.includes(' - Caseta: '))
+            .map(t => t.split(' - Caseta: '))
+            .filter(([f]) => !feria || f === feria)
+            .map(([, caseta]) => caseta)
+    )).sort();
+
+    // --- Per-pedido handlers -------------------------------------------------
+    const startEditing = (log: DailyLog) => {
+        const initQ: Record<string, number> = {};
+        log.items.forEach(i => { initQ[i.product.id] = i.prepared; });
+        setEditQuantities(initQ);
+        setEditCategory('');
+        setSelectedLogId(log.id);
+        setIsEditingOrder(true);
+    };
+
+    const handlePrint = (log: DailyLog) => {
+        printRawOrder(log).catch(err => {
+            console.error(err);
+            addToast('No se pudo abrir la vista de impresión', 'error');
+        });
+    };
+
+    const handleDownload = (log: DailyLog) => {
+        try {
+            downloadRawOrder(log);
+        } catch (err) {
+            console.error(err);
+            addToast('No se pudo descargar el pedido', 'error');
+        }
+    };
+
+    const handleDelete = async (log: DailyLog) => {
+        if (deletingLogId) return;
+        // deleteDailyLog refunds stock itself: for an OPEN pedido it adds back
+        // every item's `prepared` before deleting the row. Closed pedidos
+        // (CLOSED / APPROVED) keep their consumed units discounted (they were
+        // consumed) and legacy PENDING_PEDIDO / REJECTED never discounted.
+        const refundUnits = log.status === 'OPEN'
+            ? log.items.reduce((sum, i) => sum + (i.prepared || 0), 0)
+            : 0;
+        const consumedUnits = isClosedStatus(log.status)
+            ? log.items.reduce((sum, i) => sum + (i.consumed || 0), 0)
+            : 0;
+        const confirmMsg = log.status === 'OPEN'
+            ? `¿Seguro que quieres borrar este pedido por completo?\n\nLas ${refundUnits} unidades descontadas volverán al almacén.`
+            : isClosedStatus(log.status)
+                ? `¿Seguro que quieres borrar este pedido cerrado por completo?\n\nLas ${consumedUnits} unidades consumidas NO vuelven al almacén (ya se consumieron). Si las cantidades están mal, usa "Editar" para ajustar los sobrantes antes de borrar.`
+                : '¿Seguro que quieres borrar este pedido por completo?';
+        if (!window.confirm(confirmMsg)) return;
+        setDeletingLogId(log.id);
+        try {
+            await deleteDailyLog(log.id);
+            addToast(refundUnits > 0 ? `Pedido borrado. ${refundUnits} unidades devueltas al almacén.` : 'Pedido borrado', 'success');
+            if (selectedLogId === log.id) { setSelectedLogId(null); setIsEditingOrder(false); }
+            if (selectedLogForSobrantes === log.id) setSelectedLogForSobrantes(null);
+            if (associateLogId === log.id) setAssociateLogId(null);
+        } catch (err) {
+            console.error(err);
+            addToast('Error al borrar el pedido', 'error');
+        } finally {
+            setDeletingLogId(null);
+        }
+    };
+
+    const openDuplicateModal = (log: DailyLog) => {
+        // Default to the day after the source: same-day copies of a titled
+        // pedido would collide with the original's title.
+        setDuplicateDate(nextDayStr(log.date));
+        setDuplicateLogId(log.id);
+    };
+
+    const handleDuplicate = async () => {
+        if (!duplicateLogId || !duplicateDate || isDuplicating) return;
+        const sourceLog = allLogs.find(l => l.id === duplicateLogId);
+        if (!sourceLog) return;
+
+        if (duplicateDate === sourceLog.date && sourceLog.eventTitle) {
+            addToast(`Ya existe "${sourceLog.eventTitle}" el ${sourceLog.date}. Elige otra fecha para el duplicado.`, 'error');
+            return;
+        }
+
+        // The copy discounts stock at once, so check availability against the
+        // CURRENT warehouse (not the product snapshot stored in the source log).
+        const shortProducts: string[] = [];
+        for (const item of sourceLog.items) {
+            if (item.prepared <= 0) continue;
+            const product = products.find(p => p.id === item.product.id);
+            const available = product ? product.stock - (product.reserved || 0) : 0;
+            if (item.prepared > available) shortProducts.push(product?.name ?? item.product.name);
+        }
+        if (shortProducts.length > 0) {
+            const listed = shortProducts.slice(0, 3).join(', ') + (shortProducts.length > 3 ? '…' : '');
+            addToast(`Sin stock suficiente para: ${listed}`, 'error');
+            return;
+        }
+
+        setIsDuplicating(true);
+        try {
+            await duplicateDailyLog(duplicateLogId, duplicateDate);
+            addToast(`Pedido duplicado para el ${duplicateDate}. El stock se ha descontado del almacén.`, 'success');
+            setDuplicateLogId(null);
+        } catch (err) {
+            console.error(err);
+            addToast('Error al duplicar el pedido', 'error');
+        } finally {
+            setIsDuplicating(false);
+        }
+    };
+
+    const toggleAssociate = (log: DailyLog) => {
+        if (associateLogId === log.id) {
+            setAssociateLogId(null);
+        } else {
+            setAssocFeria('');
+            setAssocCaseta('');
+            setAssociateLogId(log.id);
+        }
+    };
+
+    const handleAssociate = async (log: DailyLog) => {
+        if (isAssociating) return;
+        if (!assocFeria) { addToast('Elige una feria para asociar el pedido.', 'error'); return; }
+        setIsAssociating(true);
+        try {
+            await assignExtraToFeria(log.id, assocFeria, assocCaseta || undefined);
+            addToast(assocCaseta ? `Pedido asociado a ${assocFeria} / ${assocCaseta}` : `Pedido asociado a ${assocFeria}`, 'success');
+            setAssociateLogId(null);
+            setAssocFeria('');
+            setAssocCaseta('');
+        } catch (err) {
+            console.error(err);
+            addToast('Error al asociar el pedido a la feria', 'error');
+        } finally {
+            setIsAssociating(false);
+        }
+    };
+
+    // --- Per-pedido render helpers ------------------------------------------
+    const renderLogActions = (log: DailyLog) => {
+        const inProgress = isInProgress(log.status);
+        const closed = isClosedStatus(log.status);
+        const isDeleting = deletingLogId === log.id;
+        return (
+            <div className="flex gap-2 flex-wrap">
+                {inProgress && (
+                    <button className="btn btn-outline btn-sm" onClick={() => startEditing(log)}>
+                        <Pencil size={14} strokeWidth={2.4} /> Editar
+                    </button>
+                )}
+                {(inProgress || closed) && (
+                    <button
+                        className={`btn btn-outline btn-sm ${closed ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
+                        onClick={() => setSelectedLogForSobrantes(log.id)}
+                        title={closed ? 'Ajustar sobrantes de un pedido ya cerrado' : 'Registrar sobrantes y cerrar el pedido'}
+                    >
+                        <PackageOpen size={14} strokeWidth={2.4} /> {closed ? 'Ajustar sobrantes' : 'Sobrantes'}
+                    </button>
+                )}
+                <button className="btn btn-outline btn-sm" onClick={() => handlePrint(log)} title="Abrir vista de impresión">
+                    <Printer size={14} strokeWidth={2.4} /> Imprimir
+                </button>
+                <button className="btn btn-outline btn-sm" onClick={() => handleDownload(log)} title="Descargar el pedido como archivo">
+                    <Download size={14} strokeWidth={2.4} /> Descargar
+                </button>
+                <button className="btn btn-outline btn-sm" onClick={() => openDuplicateModal(log)} title="Crear un pedido igual en otra fecha">
+                    <Copy size={14} strokeWidth={2.4} /> Duplicar
+                </button>
+                {isOrphanLog(log) && (
+                    <button
+                        className={`btn btn-outline btn-sm ${associateLogId === log.id ? 'border-accent-blue/50 text-accent-blue bg-accent-blue/10' : ''}`}
+                        onClick={() => toggleAssociate(log)}
+                        title="Vincular este pedido a una feria/caseta para que entre en su cierre y factura"
+                    >
+                        <Link2 size={14} strokeWidth={2.4} /> Asociar a feria
+                    </button>
+                )}
+                <button
+                    className="btn btn-outline btn-sm border-accent-red/40 text-accent-red hover:bg-accent-red/10"
+                    onClick={() => handleDelete(log)}
+                    disabled={isDeleting}
+                >
+                    {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} strokeWidth={2.4} />} Borrar
+                </button>
+            </div>
+        );
+    };
+
+    const renderAssociateBlock = (log: DailyLog) => {
+        if (associateLogId !== log.id) return null;
+        const casetas = casetaOptionsFor(assocFeria);
+        return (
+            <div className="mt-3 pt-3 border-t border-white/10 animate-fade-in">
+                <p className="text-xs text-text-muted mb-2">
+                    Sin feria, este pedido no entra en el Cierre Total ni en la factura de la feria.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                    <label className="flex-1 flex flex-col gap-1 text-xs text-text-muted min-w-0">
+                        Feria
+                        <select
+                            className="bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue w-full"
+                            value={assocFeria}
+                            onChange={e => { setAssocFeria(e.target.value); setAssocCaseta(''); }}
+                        >
+                            <option value="">Elige una feria…</option>
+                            {feriaOptions.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                    </label>
+                    <label className="flex-1 flex flex-col gap-1 text-xs text-text-muted min-w-0">
+                        Caseta (opcional)
+                        <select
+                            className="bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue w-full disabled:opacity-50"
+                            value={assocCaseta}
+                            onChange={e => setAssocCaseta(e.target.value)}
+                            disabled={!assocFeria || casetas.length === 0}
+                        >
+                            <option value="">{casetas.length === 0 ? 'Sin casetas' : 'Sin caseta'}</option>
+                            {casetas.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </label>
+                    <div className="flex gap-2 shrink-0">
+                        <button className="btn btn-outline btn-sm" onClick={() => setAssociateLogId(null)} disabled={isAssociating}>
+                            <X size={14} strokeWidth={2.4} /> Cancelar
+                        </button>
+                        <button className="btn btn-primary btn-sm" onClick={() => handleAssociate(log)} disabled={!assocFeria || isAssociating}>
+                            {isAssociating ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} strokeWidth={2.4} />} Asociar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderLogCard = (log: DailyLog) => (
+        <div key={log.id} className="card p-4 border border-white/10">
+            <div className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="font-bold text-lg break-words">{log.eventTitle || 'Pedido General'}</div>
+                        <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                            {renderStatusBadge(log.status)}
+                            <span className="text-xs text-text-muted">
+                                {log.items.length} producto{log.items.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {renderLogActions(log)}
+            </div>
+            {renderAssociateBlock(log)}
+        </div>
+    );
 
     const renderPedidoContent = () => {
         // --- INLINE SOBRANTES ---
@@ -133,10 +440,8 @@ export const EmployeeDashboard: React.FC = () => {
 
         // --- DEVOLUCIÓN TOTAL ---
         if (showTotalReturn !== null) {
-            // Collect all dates that belong to this feria (EVENT-type events with this title)
-            // showTotalReturn represents the specific base caseta title, e.g., "Pedido Feria de Prueba - Caseta: A"
-            // Wait, how do we know the feriadates? We can find the feria associated by looking at the event title.
-            // Let's assume we pass { feriaName: string, casetaBase: string } to showTotalReturn
+            // showTotalReturn carries { feriaName, casetaBase } as JSON, where
+            // casetaBase is the caseta title without any " (Extra N)" suffix.
             const parsedToken = JSON.parse(showTotalReturn);
             const { feriaName, casetaBase } = parsedToken;
 
@@ -150,7 +455,9 @@ export const EmployeeDashboard: React.FC = () => {
                 feriaDates.has(l.date) &&
                 l.eventTitle &&
                 l.eventTitle.replace(/\s*\(Extra \d+\)$/, '') === casetaBase &&
-                (l.status === 'OPEN' || l.status === 'APPROVED' || l.status === 'CLOSED')
+                // Same statuses as feriaHasOpenLogs / the caseta buttons: en
+                // curso (OPEN + legacy PENDING_PEDIDO) and already closed.
+                (isInProgress(l.status) || isClosedStatus(l.status))
             );
             return (
                 <div className="animate-fade-in">
@@ -169,8 +476,8 @@ export const EmployeeDashboard: React.FC = () => {
             );
         }
 
-        // --- EDIT MODE ---
-        if (isEditingOrder && currentLog && currentLog.status === 'PENDING_PEDIDO') {
+        // --- EDIT MODE (pedidos en curso: OPEN, or legacy PENDING_PEDIDO) ---
+        if (isEditingOrder && currentLog && isInProgress(currentLog.status)) {
             return (
                 <div className="card animate-fade-in">
                     <div className="flex justify-between items-center gap-3 mb-6">
@@ -179,6 +486,7 @@ export const EmployeeDashboard: React.FC = () => {
                             <div className="min-w-0">
                                 <h2 className="text-2xl font-bold">Editar Pedido</h2>
                                 <p className="text-text-muted text-sm mt-1 break-words">{currentLog.eventTitle || 'Pedido General'} — {selectedDate}</p>
+                                <p className="text-xs text-text-muted mt-1">Los cambios ajustan el stock del almacén al guardar.</p>
                             </div>
                         </div>
                         <button className="btn btn-outline btn-sm shrink-0" onClick={() => setIsEditingOrder(false)}><X size={14} strokeWidth={2.4} /> Cancelar</button>
@@ -206,8 +514,15 @@ export const EmployeeDashboard: React.FC = () => {
                                     const currentItem = currentLog.items.find(i => i.product.id === product.id);
                                     const qty = editQuantities[product.id] ?? (currentItem?.prepared || 0);
 
-                                    const reservedByOthers = (product.reserved || 0) - (currentItem?.prepared || 0);
-                                    const availableStock = product.stock + (currentItem?.prepared || 0) - reservedByOthers;
+                                    // OPEN units were already discounted from stock, so they are
+                                    // re-allocatable to this same pedido (add them back). Legacy
+                                    // PENDING_PEDIDO units were only reserved, never discounted:
+                                    // they still sit in `stock`, so just exclude them from
+                                    // `reserved` instead of adding them twice.
+                                    const isDiscounted = currentLog.status !== 'PENDING_PEDIDO';
+                                    const own = currentItem?.prepared || 0;
+                                    const reservedByOthers = Math.max(0, (product.reserved || 0) - (isDiscounted ? 0 : own));
+                                    const availableStock = product.stock + (isDiscounted ? own : 0) - reservedByOthers;
                                     const isOutOfStock = availableStock <= 0;
 
                                     return (
@@ -263,7 +578,7 @@ export const EmployeeDashboard: React.FC = () => {
                             setIsSaving(true);
                             try {
                                 await updatePedidoItems(currentLog.id, itemsToUpdate);
-                                addToast('Pedido actualizado correctamente', 'success');
+                                addToast('Pedido actualizado. El stock se ha ajustado.', 'success');
                                 setIsEditingOrder(false);
                             } catch (e) {
                                 console.error(e);
@@ -333,39 +648,7 @@ export const EmployeeDashboard: React.FC = () => {
                         <div className="mb-4">
                             <h3 className="section-label mb-3 px-1">Pedidos de esta Caseta</h3>
                             <div className="flex flex-col gap-3">
-                                {casetaLogs.map(log => (
-                                    <div key={log.id} className="card p-4 border border-white/10">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                            <div>
-                                                <div className="font-bold">{log.eventTitle}</div>
-                                                <div className="mt-1.5">{renderStatusBadge(log.status)}</div>
-                                            </div>
-                                            <div className="flex gap-2 flex-wrap sm:shrink-0">
-                                                {log.status === 'PENDING_PEDIDO' && (
-                                                    <button className="btn btn-outline btn-sm" onClick={() => {
-                                                        const initQ: Record<string, number> = {};
-                                                        log.items.forEach(i => { initQ[i.product.id] = i.prepared; });
-                                                        setEditQuantities(initQ);
-                                                        setSelectedLogId(log.id);
-                                                        setIsEditingOrder(true);
-                                                    }}><Pencil size={14} strokeWidth={2.4} /> Editar</button>
-                                                )}
-                                                {(log.status === 'OPEN' || log.status === 'CLOSED' || log.status === 'APPROVED') && (
-                                                    <button
-                                                        className={`btn btn-outline btn-sm ${log.status === 'APPROVED' ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
-                                                        onClick={() => setSelectedLogForSobrantes(log.id)}
-                                                        title={log.status === 'APPROVED' ? 'Ajustar sobrantes en un pedido ya aprobado' : 'Registrar sobrantes'}
-                                                    >
-                                                        <Package size={14} strokeWidth={2.4} /> {log.status === 'APPROVED' ? 'Ajustar Sobrantes' : 'Sobrantes'}
-                                                    </button>
-                                                )}
-                                                {log.status === 'REJECTED' && (
-                                                    <button className="btn btn-outline btn-sm border-accent-red text-accent-red" onClick={() => deleteDailyLog(log.id)}><Trash2 size={14} strokeWidth={2.4} /> Descartar</button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                {casetaLogs.map(renderLogCard)}
                             </div>
                         </div>
                     )}
@@ -375,13 +658,13 @@ export const EmployeeDashboard: React.FC = () => {
                             className="btn btn-primary py-4 text-base w-full"
                             onClick={() => setSelectedEventTitleForNew(selectedCaseta)}
                         >
-                            <ClipboardList size={18} strokeWidth={2.2} /> Realizar Pedido
+                            <ClipboardList size={18} strokeWidth={2.2} /> Hacer Pedido
                         </button>
                         <button
                             className="btn btn-outline py-4 text-base w-full"
                             onClick={() => setSelectedEventTitleForNew(`${selectedCaseta} (Extra ${extraCount + 1})`)}
                         >
-                            <Plus size={18} strokeWidth={2.2} /> Realizar Pedido Extra
+                            <Plus size={18} strokeWidth={2.2} /> Hacer Pedido Extra
                         </button>
                     </div>
                 </div>
@@ -390,12 +673,12 @@ export const EmployeeDashboard: React.FC = () => {
 
         // --- GESTIONAR PANEL (always shown by default) ---
 
-        // --- NEW LOGIC: COMPLETION STATE ---
-        const allLogsFinished = logsForDate.length > 0 && logsForDate.every(l => l.status === 'CLOSED' || l.status === 'APPROVED');
+        // --- COMPLETION STATE ---
+        const allLogsFinished = logsForDate.length > 0 && logsForDate.every(l => isClosedStatus(l.status));
         const allProgrammedStarted = availableProgrammedOrders.length === 0;
         const isWorkdayFinished = allLogsFinished && allProgrammedStarted;
 
-        // --- NEW LOGIC: FINAL DAY OF FERIA ---
+        // --- FINAL DAY OF FERIA ---
         // Find if selectedDate is the VERY LAST DAY of any EVENT (feria)
         const feriasEnEsteDia = events.filter(e => e.date === selectedDate && e.type === 'EVENT');
         let isFinalDay = false;
@@ -418,8 +701,8 @@ export const EmployeeDashboard: React.FC = () => {
             }
         }
 
-        // Across the whole feria: are there still OPEN logs (i.e. casetas that
-        // haven't done their total close yet)? If so, we must NOT show the
+        // Across the whole feria: are there still pedidos en curso (i.e. casetas
+        // that haven't done their total close yet)? If so, we must NOT show the
         // "feria finalizada" screen — the user still needs the cierre buttons.
         let feriaHasOpenLogs = false;
         if (isFinalDay) {
@@ -430,7 +713,7 @@ export const EmployeeDashboard: React.FC = () => {
                 feriaDays.has(l.date) &&
                 l.eventTitle &&
                 l.eventTitle.includes(feriaNameFinalDay) &&
-                l.status === 'OPEN'
+                isInProgress(l.status)
             );
         }
 
@@ -455,12 +738,11 @@ export const EmployeeDashboard: React.FC = () => {
                                 <span className="font-bold num">{logsForDate.length}</span>
                             </div>
                             <div className="p-3 rounded-lg bg-accent-blue/10 text-accent-blue font-bold text-sm flex items-center justify-center gap-2">
-                                <CheckCircle2 size={16} strokeWidth={2.4} className="shrink-0" /> Todo el stock ha sido devuelto al inventario central.
+                                <CheckCircle2 size={16} strokeWidth={2.4} className="shrink-0" /> Todo el stock sobrante ha vuelto al almacén.
                             </div>
                         </div>
                     </div>
-                    <p className="mt-8 text-text-muted text-sm italic">"Buen trabajo, equipo."</p>
-                    <div className="flex justify-center mt-6">
+                    <div className="flex flex-col sm:flex-row justify-center mt-8 gap-3">
                         <button
                             className="btn btn-outline btn-sm bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue"
                             onClick={() => setShowExtraModal(true)}
@@ -468,6 +750,14 @@ export const EmployeeDashboard: React.FC = () => {
                             <Plus size={14} strokeWidth={2.4} /> Añadir Pedido Extra / Olvidado
                         </button>
                     </div>
+                    {logsForDate.length > 0 && (
+                        <div className="mt-8 text-left">
+                            <h3 className="section-label mb-3 px-1">Pedidos de hoy</h3>
+                            <div className="flex flex-col gap-3">
+                                {logsForDate.map(renderLogCard)}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -475,8 +765,8 @@ export const EmployeeDashboard: React.FC = () => {
         // 2. Completion State: Regular Workday Finished
         if (isWorkdayFinished) {
             return (
-                <div className="animate-fade-in text-center py-12">
-                    <div className="mb-4 flex flex-col items-center">
+                <div className="animate-fade-in py-12">
+                    <div className="mb-4 flex flex-col items-center text-center">
                         <span className="empty-state-icon text-accent-green bg-accent-green/10 border-accent-green/25">
                             <CheckCircle2 size={24} strokeWidth={2.2} />
                         </span>
@@ -486,7 +776,7 @@ export const EmployeeDashboard: React.FC = () => {
                     <div className="flex flex-col sm:flex-row justify-center mt-8 gap-3">
                         <button
                             className="btn btn-outline text-sm"
-                            onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                            onClick={() => setSelectedDate(todayStr())}
                         ><CalendarDays size={14} strokeWidth={2.4} /> Ir al día de hoy</button>
                         <button
                             className="btn btn-outline text-sm bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue"
@@ -495,6 +785,14 @@ export const EmployeeDashboard: React.FC = () => {
                             <Plus size={14} strokeWidth={2.4} /> Añadir Pedido Extra
                         </button>
                     </div>
+                    {logsForDate.length > 0 && (
+                        <div className="mt-8">
+                            <h3 className="section-label mb-3 px-1">Pedidos cerrados</h3>
+                            <div className="flex flex-col gap-3">
+                                {logsForDate.map(renderLogCard)}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -546,10 +844,10 @@ export const EmployeeDashboard: React.FC = () => {
                                     l.eventTitle.replace(/\s*\(Extra \d+\)$/, '') === casetaBase
                                 );
                                 const hasAnyLogs = casetaLogsAll.length > 0;
-                                // "Closed" = no log still in OPEN status. APPROVED is still a
+                                // "Closed" = no log still en curso. A closed pedido is still a
                                 // valid target for retroactive sobrante adjustment, so we keep
                                 // the button enabled and just change the label.
-                                const allDone = hasAnyLogs && casetaLogsAll.every(l => l.status === 'CLOSED' || l.status === 'APPROVED');
+                                const allDone = hasAnyLogs && casetaLogsAll.every(l => isClosedStatus(l.status));
 
                                 return (
                                     <button
@@ -596,49 +894,7 @@ export const EmployeeDashboard: React.FC = () => {
                     <div className="mb-4">
                         <h3 className="section-label mb-3 px-1">Pedidos Activos</h3>
                         <div className="flex flex-col gap-3">
-                            {logsForDate.map(log => (
-                                <div key={log.id} className="card p-4 border border-white/10">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                        <div>
-                                            <div className="font-bold text-lg">{log.eventTitle || 'Pedido General'}</div>
-                                            <div className="mt-1.5">{renderStatusBadge(log.status)}</div>
-                                        </div>
-                                        <div className="flex gap-2 flex-wrap sm:shrink-0">
-                                            {log.status === 'PENDING_PEDIDO' && (
-                                                <button
-                                                    className="btn btn-outline btn-sm"
-                                                    onClick={() => {
-                                                        const initQ: Record<string, number> = {};
-                                                        log.items.forEach(i => { initQ[i.product.id] = i.prepared; });
-                                                        setEditQuantities(initQ);
-                                                        setSelectedLogId(log.id);
-                                                        setIsEditingOrder(true);
-                                                    }}
-                                                >
-                                                    <Pencil size={14} strokeWidth={2.4} /> Editar
-                                                </button>
-                                            )}
-                                            {(log.status === 'OPEN' || log.status === 'CLOSED' || log.status === 'APPROVED') && (
-                                                <button
-                                                    className={`btn btn-outline btn-sm ${log.status === 'APPROVED' ? 'border-accent-green/40 text-accent-green hover:bg-accent-green/10' : ''}`}
-                                                    onClick={() => setSelectedLogForSobrantes(log.id)}
-                                                    title={log.status === 'APPROVED' ? 'Ajustar sobrantes en un pedido ya aprobado' : 'Registrar sobrantes'}
-                                                >
-                                                    <Package size={14} strokeWidth={2.4} /> {log.status === 'APPROVED' ? 'Ajustar Sobrantes' : 'Sobrantes'}
-                                                </button>
-                                            )}
-                                            {log.status === 'REJECTED' && (
-                                                <button
-                                                    className="btn btn-outline btn-sm border-accent-red text-accent-red"
-                                                    onClick={() => { deleteDailyLog(log.id); }}
-                                                >
-                                                    <Trash2 size={14} strokeWidth={2.4} /> Descartar
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                            {logsForDate.map(renderLogCard)}
                         </div>
                     </div>
                 )}
@@ -710,19 +966,75 @@ export const EmployeeDashboard: React.FC = () => {
                                 else setSelectedEventTitleForNew('');
                             }}
                         >
-                            <ClipboardList size={18} strokeWidth={2.2} /> Realizar Pedido
+                            <ClipboardList size={18} strokeWidth={2.2} /> Hacer Pedido
                         </button>
                         <button
                             className="btn btn-outline py-4 text-base w-full"
                             onClick={() => setShowExtraModal(true)}
                         >
-                            <Plus size={18} strokeWidth={2.2} /> Realizar Pedido Extra
+                            <Plus size={18} strokeWidth={2.2} /> Hacer Pedido Extra
                         </button>
                     </div>
                 )}
             </div>
         );
 
+    };
+
+    // --- DUPLICATE MODAL: pick the date for the copy ---
+    const renderDuplicateModal = () => {
+        if (!duplicateLogId) return null;
+        const sourceLog = allLogs.find(l => l.id === duplicateLogId);
+        if (!sourceLog) return null;
+        const unitCount = sourceLog.items.reduce((sum, i) => sum + i.prepared, 0);
+
+        return (
+            <div className="modal-overlay" onClick={() => { if (!isDuplicating) setDuplicateLogId(null); }}>
+                <div className="modal-panel max-w-sm" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-start justify-between gap-3 mb-5">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <span className="icon-chip icon-chip-blue"><Copy size={18} strokeWidth={2.2} /></span>
+                            <div className="min-w-0">
+                                <h2 className="text-xl font-bold">Duplicar pedido</h2>
+                                <p className="text-text-muted text-sm mt-0.5 break-words">{sourceLog.eventTitle || 'Pedido General'} — {sourceLog.date}</p>
+                            </div>
+                        </div>
+                        <button
+                            aria-label="Cerrar"
+                            className="text-text-muted hover:text-white transition-colors p-1 shrink-0"
+                            onClick={() => setDuplicateLogId(null)}
+                            disabled={isDuplicating}
+                        ><X size={18} strokeWidth={2.4} /></button>
+                    </div>
+
+                    <label className="flex flex-col gap-1.5 text-sm text-text-muted mb-4">
+                        Fecha del nuevo pedido
+                        <input
+                            type="date"
+                            className="bg-bg-primary/50 border border-white/20 rounded-lg p-3 text-white outline-none focus:border-accent-blue w-full"
+                            value={duplicateDate}
+                            onChange={e => setDuplicateDate(e.target.value)}
+                            disabled={isDuplicating}
+                        />
+                    </label>
+
+                    <p className="text-xs text-text-muted mb-5">
+                        Se creará un pedido en curso con los mismos {sourceLog.items.length} productos ({unitCount} unidades).
+                        El stock se descontará del almacén al instante.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                        <button className="btn btn-outline" onClick={() => setDuplicateLogId(null)} disabled={isDuplicating}>
+                            Cancelar
+                        </button>
+                        <button className="btn btn-primary" onClick={handleDuplicate} disabled={!duplicateDate || isDuplicating}>
+                            {isDuplicating ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} strokeWidth={2.2} />}
+                            {isDuplicating ? 'Duplicando...' : 'Duplicar'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     // --- CASETA SELECTION MODAL FOR A NEW (NON-EXTRA) ORDER ---
@@ -953,13 +1265,23 @@ export const EmployeeDashboard: React.FC = () => {
 
     return (
         <div className="w-full">
-            <EmployeeCalendar
+            <div className="page-header">
+                <div>
+                    <div className="section-label mb-2">Operación</div>
+                    <h1 className="page-title">Pedidos</h1>
+                    <p className="page-subtitle">
+                        Elige un día, haz el pedido (descuenta stock al instante) y al terminar registra los sobrantes para cerrarlo.
+                    </p>
+                </div>
+            </div>
+            <PedidosCalendar
                 selectedDate={selectedDate}
                 onSelectDate={setSelectedDate}
                 currentMonth={currentMonth}
                 onMonthChange={setCurrentMonth}
             />
             {renderPedidoContent()}
+            {renderDuplicateModal()}
             {renderNewPedidoModal()}
             {renderExtraModal()}
         </div>

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppState, Role, Product, DailyLog, InventoryItem, EventType, BackupSnapshot, BackupTrigger } from '../types';
 import { supabase, fetchAll, applyStockDeltas } from '../lib/supabaseClient';
-import { createClient } from '@supabase/supabase-js';
 import { useToast } from './ToastContext';
 
 interface AppContextType extends AppState {
@@ -12,44 +11,27 @@ interface AppContextType extends AppState {
     updateProduct: (product: Product) => Promise<void>;
     deleteProduct: (id: string) => Promise<void>;
     openDailyLog: (date: string, initialItems: InventoryItem[], eventTitle?: string) => Promise<void>;
-    approvePedido: (id: string) => Promise<void>;
-    rejectPedido: (id: string) => Promise<void>;
     deleteDailyLog: (id: string) => Promise<void>;
-    logConsumption: (id: string, items: InventoryItem[]) => Promise<void>;
-    approveDailyLog: (id: string) => Promise<void>;
+    logConsumption: (id: string, items: InventoryItem[], opts?: { skipBackup?: boolean }) => Promise<void>;
     addEvent: (event: EventType) => Promise<void>;
+    addEvents: (events: EventType[]) => Promise<void>;
     removeEvent: (id: string) => Promise<void>;
+    removeEvents: (ids: string[]) => Promise<void>;
     refreshData: () => Promise<void>;
     updatePedidoItems: (logId: string, items: { product: Product, prepared: number }[]) => Promise<void>;
     editHistoricalLog: (logId: string, items: { product: Product, prepared: number, consumed: number }[]) => Promise<void>;
     editOrderTotal: (eventTitle: string, items: { product: Product, prepared: number, consumed: number }[]) => Promise<void>;
-    repairPendingStock: () => Promise<number>;
     duplicateDailyLog: (sourceLogId: string, newDate: string) => Promise<void>;
     assignExtraToFeria: (logId: string, feriaName: string, casetaName?: string) => Promise<void>;
-    listBackups: () => Promise<BackupSnapshot[]>;
     createBackup: (label: string, triggerType?: BackupTrigger, description?: string) => Promise<BackupSnapshot | null>;
-    deleteBackup: (id: string) => Promise<void>;
-    restoreFromBackup: (id: string) => Promise<void>;
-    isPushEnabled: boolean;
-    requestPushPermission: () => Promise<boolean>;
 }
 
 const defaultCategories = ['Artículos de limpieza', 'Precocinados', 'Bebidas', 'General'];
 
-const urlB64ToUint8Array = (base64String: string) => {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-};
-
 const getInitialState = (): AppState => {
     // Role still in local storage to keep session
-    const role = localStorage.getItem('dukeControlRole') as Role || null;
+    // Only the admin profile exists now; any legacy stored role forces a re-login.
+    const role: Role = localStorage.getItem('dukeControlRole') === 'MASTER' ? 'MASTER' : null;
     const savedCategories = localStorage.getItem('macarioCategories');
     let categories: string[] = savedCategories ? JSON.parse(savedCategories) : defaultCategories;
 
@@ -137,10 +119,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         let itemsData: any[] = [];
         try {
             logsData = await fetchAll<any>('daily_logs', { orderBy: { column: 'date', ascending: false } });
-        } catch (e) { console.error('Error fetching logs:', e); return; }
+        } catch (e) { console.error('Error fetching logs:', e); return false; }
         try {
             itemsData = await fetchAll<any>('log_items');
-        } catch (e) { console.error('Error fetching log items:', e); return; }
+        } catch (e) { console.error('Error fetching log items:', e); return false; }
 
         const parsedLogs: DailyLog[] = logsData.map(log => {
             const items = itemsData
@@ -180,84 +162,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             activeLogs,
             historicalLogs
         }));
+        return true;
+    };
+
+    // Surface backend failures instead of silently rendering empty screens
+    // (an unreachable Supabase looked exactly like "no hay pedidos").
+    const markDb = (ok: boolean) => {
+        setState(s => (!!s.dbUnreachable === !ok) ? s : { ...s, dbUnreachable: !ok });
     };
 
     const refreshData = async () => {
         const prods = await refreshProducts();
-        if (prods) await refreshLogs(prods);
+        if (!prods) { markDb(false); return; }
+        const okLogs = await refreshLogs(prods);
 
         // Refresh Events
+        let okEvents = true;
         try {
             const eventsData = await fetchAll<EventType>('events');
             setState(s => ({ ...s, events: eventsData }));
         } catch (eventsError) {
+            okEvents = false;
             console.error("Error fetching events:", eventsError);
         }
-    };
-
-    const [isPushEnabled, setIsPushEnabled] = useState(false);
-
-    // Expose this so UI can call it on user click
-    const requestPushPermission = async () => {
-        const VAPID_PUBLIC_KEY = 'BOm8-2sqpNvLphDwDp2Vw2vUjiO5ksWSOmosp7syQjye7_PE_YojzXDOMLyZCOxgL7MGPPHPsX5gH709PnGEglg';
-
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-            addToast("Tu navegador no soporta notificaciones", "error");
-            return false;
-        }
-
-        try {
-            // First register service worker if not already registered
-            const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-
-            // Clean up old subscriptions to prevent key mismatch errors
-            const existingSub = await registration.pushManager.getSubscription();
-            if (existingSub) {
-                await existingSub.unsubscribe();
-            }
-
-            // Ask for permission explicitly
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                setIsPushEnabled(false);
-                return false;
-            }
-
-            // Subscribe to push
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY)
-            });
-
-            // Save subscription to Supabase
-            const role = localStorage.getItem('dukeControlRole') || 'EMPLOYEE';
-            const subJson = subscription.toJSON();
-            await supabase.from('push_subscriptions').upsert({
-                endpoint: subJson.endpoint,
-                user_role: role,
-                subscription: subJson
-            }, { onConflict: 'endpoint' });
-
-            setIsPushEnabled(true);
-            addToast("Notificaciones activadas", "success");
-            return true;
-
-        } catch (e: any) {
-            console.error('Push subscribe failed:', e);
-            addToast(`Error al activar notificaciones: ${e.message || 'Desconocido'}`, "error");
-            return false;
-        }
+        markDb(okLogs && okEvents);
     };
 
     useEffect(() => {
         refreshData();
 
-        // Check if we already have permission on mount, without asking again
-        if ('Notification' in window && Notification.permission === 'granted') {
-            setIsPushEnabled(true);
-            // We could optionally re-subscribe here quietly, but let's keep it simple
-            // and assume it's still alive.
-        }
 
         let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
         const debouncedRefresh = () => {
@@ -287,8 +220,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useEffect(() => {
         if ('setAppBadge' in navigator && navigator.setAppBadge && navigator.clearAppBadge) {
             if (state.role === 'MASTER') {
-                const pendingCount = [...state.activeLogs, ...state.historicalLogs].filter(
-                    l => l.status === 'PENDING_PEDIDO' || l.status === 'CLOSED'
+                // Same set as the Layout badge: pedidos still waiting for sobrantes.
+                const pendingCount = state.activeLogs.filter(
+                    l => l.status !== 'APPROVED' && l.status !== 'REJECTED'
                 ).length;
 
                 if (pendingCount > 0) {
@@ -336,10 +270,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const timestamp = Date.now();
         const safeTitle = eventTitle ? eventTitle.replace(/---/g, '-') : '';
         const logId = eventTitle ? `log-${timestamp}---${safeTitle}` : `log-${timestamp}`;
+        // Single-admin flow: a pedido is created directly as OPEN (no separate
+        // approval step) and its quantities are discounted from stock right away.
         const { error: logError } = await supabase.from('daily_logs').insert({
             id: logId,
             date,
-            status: 'PENDING_PEDIDO'
+            status: 'OPEN'
         });
         if (logError) { addToast("Error creando pedido", "error"); throw logError; }
 
@@ -354,75 +290,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (itemsError) throw itemsError;
         }
 
-        // Notify masters via push notification - called from employee's device
-        // so it fires even when the master app is closed
+        // Discount stock in one batched write (fresh DB values, clamped at 0).
+        // If that write fails, remove the just-created pedido so we never leave
+        // an OPEN pedido whose units were not actually discounted (closing it
+        // later would refund units that were never taken).
+        const openDeltas: Record<string, number> = {};
+        for (const item of initialItems) {
+            openDeltas[item.product.id] = (openDeltas[item.product.id] ?? 0) - item.prepared;
+        }
         try {
-            const { createClient } = await import('@supabase/supabase-js');
-            const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-            await sb.functions.invoke('send-web-push', {
-                body: {
-                    title: '📦 Nuevo Pedido Creado',
-                    message: `La cocina ha enviado un pedido para el ${date}${eventTitle ? ` (${eventTitle})` : ''}. Pendiente de revisión.`,
-                    target_role: 'MASTER'
-                },
-                headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
-            });
-        } catch (e) {
-            console.warn('Push notification failed (non-critical):', e);
+            await applyStockDeltas(openDeltas);
+        } catch (stockErr) {
+            console.error('Stock discount failed, rolling back pedido', stockErr);
+            await supabase.from('log_items').delete().eq('daily_log_id', logId);
+            await supabase.from('daily_logs').delete().eq('id', logId);
+            addToast("No se pudo descontar el stock. El pedido no se ha creado.", "error");
+            throw stockErr;
         }
 
-        await refreshData();
-    };
-
-    const approvePedido = async (id: string) => {
-        const log = state.activeLogs.find(l => l.id === id);
-        if (!log) return;
-
-        // Safety check: verify the order is still PENDING_PEDIDO in DB (prevents double-decrement)
-        const { data: currentLogStatus } = await supabase.from('daily_logs').select('status').eq('id', id).single();
-        if (currentLogStatus?.status !== 'PENDING_PEDIDO') return;
-
-        // Decrease stock using CURRENT values from DB, not stale state.
-        // Batched: 2 requests total instead of 2 per product.
-        const approveDeltas: Record<string, number> = {};
-        for (const item of log.items) {
-            approveDeltas[item.product.id] = (approveDeltas[item.product.id] ?? 0) - item.prepared;
-        }
-        await applyStockDeltas(approveDeltas);
-
-        const { error } = await supabase.from('daily_logs').update({ status: 'OPEN' }).eq('id', id);
-        if (error) throw error;
-        await refreshData();
-    };
-
-    const rejectPedido = async (id: string) => {
-        await createBackup('Antes de rechazar pedido', 'auto-reject', `log ${id}`);
-        const { error } = await supabase.from('daily_logs').update({ status: 'REJECTED' }).eq('id', id);
-        if (error) throw error;
         await refreshData();
     };
 
     const deleteDailyLog = async (id: string) => {
-        await createBackup('Antes de borrar pedido', 'auto-delete', `log ${id}`);
+        const log = state.activeLogs.find(l => l.id === id) || state.historicalLogs.find(l => l.id === id);
+        await createBackup('Antes de borrar pedido', 'auto-delete', `${log?.date || ''} ${log?.eventTitle || id}`.trim());
+
+        // Stock held by this pedido:
+        //  - OPEN: every `prepared` unit was discounted at creation and nothing
+        //    has been refunded yet -> give it all back.
+        //  - CLOSED/APPROVED: only the consumed units remain discounted and
+        //    they physically left the warehouse -> nothing to refund.
+        //  - legacy PENDING/REJECTED: never touched stock.
+        const refund: Record<string, number> = {};
+        if (log && log.status === 'OPEN') {
+            for (const item of log.items) {
+                refund[item.product.id] = (refund[item.product.id] ?? 0) + item.prepared;
+            }
+        }
+        const hasRefund = Object.values(refund).some(v => v !== 0);
+        if (hasRefund) await applyStockDeltas(refund);
+
         const { error } = await supabase.from('daily_logs').delete().eq('id', id);
-        if (error) throw error;
+        if (error) {
+            // Compensate: the pedido still exists, so take the refund back.
+            if (hasRefund) {
+                const undo: Record<string, number> = {};
+                for (const [pid, v] of Object.entries(refund)) undo[pid] = -v;
+                try { await applyStockDeltas(undo); } catch (e) { console.error('Refund rollback failed', e); }
+            }
+            throw error;
+        }
         await refreshData();
     };
 
-    const logConsumption = async (id: string, itemsWithConsumption: InventoryItem[]) => {
+    const logConsumption = async (id: string, itemsWithConsumption: InventoryItem[], opts?: { skipBackup?: boolean }) => {
         const currentLog = state.activeLogs.find(l => l.id === id) || state.historicalLogs.find(l => l.id === id);
         if (!currentLog) throw new Error("Log not found");
 
         const oldStatus = currentLog.status;
 
-        // Status transition:
-        //  - OPEN  -> CLOSED  (first time we register sobrantes)
-        //  - CLOSED -> CLOSED (re-running sobrantes before approval)
-        //  - APPROVED -> APPROVED (re-running on an already approved log;
-        //    keep it in historicalLogs so the financial panel still shows it)
-        //  - PENDING/REJECTED: untouched here, but transition to CLOSED to
-        //    keep the legacy behaviour predictable.
-        const targetStatus = oldStatus === 'APPROVED' ? 'APPROVED' : 'CLOSED';
+        // Single-admin flow: registering sobrantes closes the pedido for good.
+        // Whatever the previous status (OPEN first close, CLOSED/APPROVED
+        // re-adjustment, legacy PENDING/REJECTED), it ends APPROVED so it shows
+        // up in the financial panel immediately. Stock maths below still branch
+        // on the OLD status, which is what determines what was already
+        // discounted/refunded.
+        if (!opts?.skipBackup) {
+            await createBackup('Antes de cerrar pedido (sobrantes)', 'auto-approve', `${currentLog.date} ${currentLog.eventTitle || ''}`.trim());
+        }
+        const targetStatus = 'APPROVED';
         const { error: logError } = await supabase.from('daily_logs').update({ status: targetStatus }).eq('id', id);
         if (logError) throw logError;
 
@@ -487,31 +423,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await refreshData();
     };
 
-    const approveDailyLog = async (id: string) => {
-        const log = state.activeLogs.find(l => l.id === id) || state.historicalLogs.find(l => l.id === id);
-        await createBackup('Antes de aprobar servicio', 'auto-approve', `${log?.date || ''} ${log?.eventTitle || ''}`.trim());
-        const { error } = await supabase.from('daily_logs').update({ status: 'APPROVED' }).eq('id', id);
-        if (error) throw error;
-
-        // Usar cliente limpio (sin rate limiter) igual que el botón de prueba
-        try {
-            const { createClient } = await import('@supabase/supabase-js');
-            const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-            await sb.functions.invoke('send-web-push', {
-                body: {
-                    title: '📄 Nueva Factura Disponible',
-                    message: `Se ha aprobado el pedido del ${log?.date || ''}${log?.eventTitle ? ` (${log.eventTitle})` : ''}. Ya puedes consultarlo e imprimirlo.`,
-                    target_role: 'VIEWER'
-                },
-                headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
-            });
-        } catch (e) {
-            console.warn('Push VIEWER failed (non-critical):', e);
-        }
-
-        await refreshData();
-    };
-
     const updatePedidoItems = async (logId: string, itemsToUpdate: { product: Product, prepared: number }[]) => {
         const currentLog = state.activeLogs.find(l => l.id === logId) || state.historicalLogs.find(l => l.id === logId);
         const isAlreadyDiscounted = currentLog?.status === 'OPEN' || currentLog?.status === 'CLOSED' || currentLog?.status === 'APPROVED';
@@ -567,53 +478,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const addEvent = async (event: EventType) => {
-        const { error } = await supabase.from('events').insert({
-            id: event.id,
-            date: event.date,
-            title: event.title,
-            description: event.description,
-            type: event.type
-        });
-
-        if (error) {
-            addToast("Error al guardar el evento", "error");
-            console.error(error);
-        } else {
-            // Send push notification when an event is successfully created
-            try {
-                const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-                await sb.functions.invoke('send-web-push', {
-                    body: { title: '📅 Nuevo Evento Programado', message: 'Se ha añadido un nuevo evento o feria al calendario.', target_role: 'MASTER' },
-                    headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
-                });
-            } catch (e) {
-                console.warn('Push notification failed (non-critical):', e);
-            }
-            await refreshData();
-        }
+        await addEvents([event]);
     };
 
-    const repairPendingStock = async (): Promise<number> => {
-        // Fetch all PENDING_PEDIDO log IDs
-        const { data: pendingLogs } = await supabase.from('daily_logs').select('id').eq('status', 'PENDING_PEDIDO');
-        if (!pendingLogs || pendingLogs.length === 0) return 0;
-
-        const pendingIds = pendingLogs.map((l: any) => l.id);
-
-        // Fetch all items from those logs
-        const { data: pendingItems } = await supabase.from('log_items').select('product_id, prepared').in('daily_log_id', pendingIds);
-        if (!pendingItems || pendingItems.length === 0) return 0;
-
-        // Sum prepared per product
-        const toRestore: Record<string, number> = {};
-        for (const item of pendingItems) {
-            toRestore[item.product_id] = (toRestore[item.product_id] || 0) + item.prepared;
+    // Bulk insert: a 6-day feria with 3 casetas is 24 rows -> 1 request.
+    const addEvents = async (eventsToAdd: EventType[]) => {
+        if (eventsToAdd.length === 0) return;
+        const rows = eventsToAdd.map(e => ({
+            id: e.id,
+            date: e.date,
+            title: e.title,
+            description: e.description ?? '',
+            type: e.type
+        }));
+        const { error } = await supabase.from('events').insert(rows);
+        if (error) {
+            addToast("Error al guardar en el calendario", "error");
+            console.error(error);
+            throw error;
         }
-
-        const fixed = await applyStockDeltas(toRestore);
-
         await refreshData();
-        return fixed;
     };
 
     const editHistoricalLog = async (
@@ -852,36 +736,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem(BACKUP_INDEX_KEY, JSON.stringify(ids));
     };
 
-    const readBackup = (id: string): any | null => {
-        try {
-            const raw = localStorage.getItem(BACKUP_KEY_PREFIX + id);
-            return raw ? JSON.parse(raw) : null;
-        } catch { return null; }
-    };
-
-    const listBackups = async (): Promise<BackupSnapshot[]> => {
-        const ids = readBackupIndex();
-        const items: BackupSnapshot[] = [];
-        for (const id of ids) {
-            const row = readBackup(id);
-            if (row) {
-                items.push({
-                    id: row.id,
-                    created_at: row.created_at,
-                    label: row.label,
-                    trigger_type: row.trigger_type,
-                    description: row.description,
-                    products_count: row.products_count,
-                    events_count: row.events_count,
-                    daily_logs_count: row.daily_logs_count,
-                    log_items_count: row.log_items_count,
-                    size_bytes: row.size_bytes,
-                });
-            }
-        }
-        return items.sort((a, b) => b.created_at.localeCompare(a.created_at));
-    };
-
     const createBackup = async (
         label: string,
         triggerType: BackupTrigger = 'manual',
@@ -946,45 +800,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             console.warn('Backup snapshot failed:', e?.message || e);
             return null;
         }
-    };
-
-    const deleteBackup = async (id: string): Promise<void> => {
-        localStorage.removeItem(BACKUP_KEY_PREFIX + id);
-        writeBackupIndex(readBackupIndex().filter(x => x !== id));
-    };
-
-    const restoreFromBackup = async (id: string): Promise<void> => {
-        const row = readBackup(id);
-        if (!row) throw new Error('Copia no encontrada');
-        const payload = row.payload;
-        if (!payload) throw new Error('Copia sin datos');
-
-        // Safety snapshot before applying
-        await createBackup('Pre-restauración', 'auto-restore', `Antes de restaurar ${row.label || id}`);
-
-        await supabase.from('log_items').delete().neq('id', '___');
-        await supabase.from('daily_logs').delete().neq('id', '___');
-
-        const curEvents = await supabase.from('events').select('id');
-        const backupEventIds = new Set((payload.events || []).map((e: any) => e.id));
-        const eventsToDelete = (curEvents.data || []).filter((e: any) => !backupEventIds.has(e.id)).map((e: any) => e.id);
-        if (eventsToDelete.length > 0) {
-            await supabase.from('events').delete().in('id', eventsToDelete);
-        }
-
-        const curProducts = await supabase.from('products').select('id');
-        const backupProductIds = new Set((payload.products || []).map((p: any) => p.id));
-        const productsToDelete = (curProducts.data || []).filter((p: any) => !backupProductIds.has(p.id)).map((p: any) => p.id);
-        if (productsToDelete.length > 0) {
-            await supabase.from('products').delete().in('id', productsToDelete);
-        }
-
-        if (payload.products?.length) await supabase.from('products').upsert(payload.products);
-        if (payload.events?.length) await supabase.from('events').upsert(payload.events);
-        if (payload.daily_logs?.length) await supabase.from('daily_logs').insert(payload.daily_logs);
-        if (payload.log_items?.length) await supabase.from('log_items').insert(payload.log_items);
-
-        await refreshData();
     };
 
     const assignExtraToFeria = async (logId: string, feriaName: string, casetaName?: string): Promise<void> => {
@@ -1070,14 +885,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const removeEvent = async (id: string) => {
-        const { error } = await supabase.from('events').delete().eq('id', id);
+        await removeEvents([id]);
+    };
 
+    // Bulk delete: removing a whole feria (all days x all casetas) is 1 request.
+    const removeEvents = async (ids: string[]) => {
+        if (ids.length === 0) return;
+        const { error } = await supabase.from('events').delete().in('id', ids);
         if (error) {
-            addToast("Error al eliminar el evento", "error");
+            addToast("Error al eliminar del calendario", "error");
             console.error(error);
-        } else {
-            await refreshData();
+            throw error;
         }
+        await refreshData();
     };
 
     return (
@@ -1090,26 +910,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             updateProduct,
             deleteProduct,
             openDailyLog,
-            approvePedido,
-            rejectPedido,
             deleteDailyLog,
             logConsumption,
-            approveDailyLog,
             addEvent,
+            addEvents,
             removeEvent,
+            removeEvents,
             refreshData,
             updatePedidoItems,
             editHistoricalLog,
             editOrderTotal,
-            repairPendingStock,
             duplicateDailyLog,
             assignExtraToFeria,
-            listBackups,
-            createBackup,
-            deleteBackup,
-            restoreFromBackup,
-            isPushEnabled,
-            requestPushPermission
+            createBackup
         }}>
             {children}
         </AppContext.Provider>

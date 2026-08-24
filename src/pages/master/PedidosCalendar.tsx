@@ -3,6 +3,12 @@ import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Package, XCircle
 import { useAppContext } from '../../context/AppContext';
 import { DailyLog } from '../../types';
 
+// Local-time "YYYY-MM-DD" (same as FeriaCalendar). Never toISOString().slice —
+// it shifts the day by the timezone offset around midnight.
+const pad = (n: number) => String(n).padStart(2, '0');
+const toDateStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayStr = () => toDateStr(new Date());
+
 // Helper to get days in month
 function getDaysInMonth(year: number, month: number) {
     return new Date(year, month + 1, 0).getDate();
@@ -13,7 +19,7 @@ function getFirstDayOfMonth(year: number, month: number) {
     return new Date(year, month, 1).getDay();
 }
 
-export const EmployeeCalendar: React.FC<{
+export const PedidosCalendar: React.FC<{
     selectedDate: string;
     onSelectDate: (date: string) => void;
     currentMonth: Date;
@@ -47,17 +53,17 @@ export const EmployeeCalendar: React.FC<{
             return <div className={`text-xs mt-1 ${isSelected ? 'text-white/80' : 'text-text-muted/50'}`}>Sin Pedido</div>;
         }
 
+        // Single-admin flow: OPEN/PENDING_PEDIDO = en curso, CLOSED/APPROVED = cerrado,
+        // REJECTED = descartado (legacy).
         switch (log.status) {
             case 'PENDING_PEDIDO':
-                return <div className={`text-xs mt-1 ${isSelected ? 'text-white/90 font-bold' : 'text-accent-blue'}`}>Esperando Aprobación</div>;
-            case 'REJECTED':
-                return <div className={`text-xs mt-1 flex items-center gap-1 ${isSelected ? 'text-white/90 font-bold' : 'text-accent-red'}`}>Rechazado <XCircle size={11} className="shrink-0" /></div>;
             case 'OPEN':
-                return <div className={`text-xs mt-1 ${isSelected ? 'text-white/90 font-bold' : 'text-yellow-400'}`}>Servicio Abierto</div>;
+                return <div className={`text-xs mt-1 ${isSelected ? 'text-white/90 font-bold' : 'text-accent-green'}`}>En curso</div>;
             case 'CLOSED':
-                return <div className={`text-xs mt-1 ${isSelected ? 'text-white/90 font-bold' : 'text-accent-green'}`}>Cerrado (Pendiente)</div>;
             case 'APPROVED':
-                return <div className={`text-xs mt-1 flex items-center gap-1 ${isSelected ? 'text-white/90 font-bold' : 'text-text-muted'}`}>Realizado <CheckCircle2 size={11} className="shrink-0" /></div>;
+                return <div className={`text-xs mt-1 flex items-center gap-1 ${isSelected ? 'text-white/90 font-bold' : 'text-text-muted'}`}>Cerrado <CheckCircle2 size={11} className="shrink-0" /></div>;
+            case 'REJECTED':
+                return <div className={`text-xs mt-1 flex items-center gap-1 ${isSelected ? 'text-white/90 font-bold' : 'text-accent-red'}`}>Descartado <XCircle size={11} className="shrink-0" /></div>;
             default:
                 return null;
         }
@@ -65,7 +71,7 @@ export const EmployeeCalendar: React.FC<{
 
     const renderCalendar = () => {
         const days = [];
-        const todayStr = new Date().toISOString().split('T')[0];
+        const today = todayStr();
 
         // Empty slots for days before the 1st
         for (let i = 0; i < startingDay; i++) {
@@ -76,7 +82,7 @@ export const EmployeeCalendar: React.FC<{
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const log = logsByDate.get(dateStr);
             const isSelected = selectedDate === dateStr;
-            const isToday = dateStr === todayStr;
+            const isToday = dateStr === today;
 
             days.push(
                 <button
@@ -92,7 +98,7 @@ export const EmployeeCalendar: React.FC<{
                         {isToday && <span className={`text-[10px] uppercase text-white px-1 rounded ${isSelected ? 'bg-white/25' : 'bg-accent-blue'}`}>Hoy</span>}
                     </div>
                     {getStatusUI(log, isSelected)}
-                    {/* RenderAdminEvents in Employee View */}
+                    {/* Ferias/casetas programadas ese día */}
                     <div className="mt-1 flex flex-col gap-1 w-full overflow-hidden">
                         {events.filter(e => e.date === dateStr).slice(0, 2).map(e => (
                             <div key={e.id} className={`text-[9px] sm:text-[10px] flex items-center gap-1 px-1 rounded-sm w-full text-left ${e.type === 'EVENT' ? 'bg-accent-blue/30 text-accent-blue' : 'bg-accent-green/30 text-accent-green'}`} title={e.title}>
@@ -116,7 +122,7 @@ export const EmployeeCalendar: React.FC<{
                 <span className="icon-chip icon-chip-blue"><CalendarDays size={18} strokeWidth={2.2} /></span>
                 <div>
                     <h2 className="text-2xl font-bold mb-1">Planificador de Pedidos</h2>
-                    <p className="text-sm text-text-muted">Selecciona cualquier día para crear pedidos futuros o gestionar sobrantes.</p>
+                    <p className="text-sm text-text-muted">Selecciona un día para hacer pedidos o registrar sus sobrantes.</p>
                 </div>
             </div>
 

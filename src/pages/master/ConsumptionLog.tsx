@@ -9,7 +9,7 @@ export const ConsumptionLog: React.FC<{
     aggregatedLogs?: DailyLog[],
     onClose?: () => void
 }> = ({ currentLog, aggregatedLogs, onClose }) => {
-    const { logConsumption } = useAppContext();
+    const { logConsumption, createBackup } = useAppContext();
     const { addToast } = useToast();
 
     // sobrantes[productId] = units leftover (to return to warehouse)
@@ -81,8 +81,8 @@ export const ConsumptionLog: React.FC<{
 
     const handleEndDay = async () => {
         const confirmMsg = aggregatedLogs
-            ? `¿Seguro que deseas realizar la DEVOLUCIÓN TOTAL? Esto cerrará ${aggregatedLogs.length} pedidos de esta feria.`
-            : '¿Seguro que deseas finalizar el servicio? Esto guardará los sobrantes.';
+            ? `¿Realizar la DEVOLUCIÓN TOTAL? Esto cerrará ${aggregatedLogs.length} pedidos de esta feria y devolverá los sobrantes al almacén.`
+            : '¿Cerrar el pedido y guardar los sobrantes? Las unidades sobrantes volverán al almacén.';
 
         if (!window.confirm(confirmMsg)) return;
         if (isSaving) return;
@@ -100,6 +100,10 @@ export const ConsumptionLog: React.FC<{
             if (currentLog) {
                 await logConsumption(currentLog.id, itemsWithConsumption);
             } else if (aggregatedLogs) {
+                // One snapshot for the whole cierre instead of one per pedido:
+                // every logConsumption below skips its own auto-backup.
+                await createBackup('Antes del cierre total de feria', 'auto-approve', displayTitle);
+
                 // To distribute consumption accurately without rounding errors:
                 // For each product, we track how much consumption has been assigned so far.
                 const productConsumptionAssigned: Record<string, number> = {};
@@ -125,15 +129,20 @@ export const ConsumptionLog: React.FC<{
                         return { ...item, consumed: Math.max(0, assigned) };
                     });
 
-                    await logConsumption(log.id, logItems);
+                    await logConsumption(log.id, logItems, { skipBackup: true });
                 }
             }
 
-            addToast('Devolución total completada con éxito', 'success');
+            addToast(
+                currentLog
+                    ? 'Sobrantes guardados. Pedido cerrado.'
+                    : `Devolución total completada. ${aggregatedLogs?.length ?? 0} pedidos cerrados.`,
+                'success'
+            );
             if (onClose) onClose();
         } catch (error) {
             console.error("Error finalizing return:", error);
-            addToast('Error al guardar la devolución', 'error');
+            addToast('Error al guardar los sobrantes', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -153,11 +162,11 @@ export const ConsumptionLog: React.FC<{
                         {aggregatedLogs ? <Flag size={18} strokeWidth={2.2} /> : <PackageOpen size={18} strokeWidth={2.2} />}
                     </span>
                     <div className="min-w-0">
-                        <h2 className="text-2xl font-bold mb-1">{aggregatedLogs ? 'Devolución Total' : 'Productos Sobrantes'}</h2>
+                        <h2 className="text-2xl font-bold mb-1">{aggregatedLogs ? 'Devolución Total' : 'Registrar Sobrantes'}</h2>
                         <p className="text-text-muted text-sm">
                             {aggregatedLogs
                                 ? `Indica el stock TOTAL sobrante tras finalizar la feria ${displayTitle}.`
-                                : 'Indica cuántas unidades han sobrado de cada producto para devolverlas al almacén.'}
+                                : 'Indica cuántas unidades han sobrado de cada producto. Al guardar, vuelven al almacén y el pedido queda cerrado.'}
                         </p>
                     </div>
                 </div>
@@ -289,10 +298,10 @@ export const ConsumptionLog: React.FC<{
                         ? <Flag size={18} strokeWidth={2.2} />
                         : <Lock size={18} strokeWidth={2.2} />}
                 {isSaving
-                    ? 'Procesando...'
+                    ? 'Guardando...'
                     : aggregatedLogs
-                        ? 'Finalizar Feria y Devolver Todo'
-                        : 'Enviar Sobrantes y Finalizar'}
+                        ? 'Finalizar feria y devolver todo'
+                        : 'Guardar sobrantes y cerrar pedido'}
             </button>
         </div>
     );

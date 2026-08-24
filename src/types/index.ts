@@ -1,4 +1,4 @@
-export type Role = 'EMPLOYEE' | 'MASTER' | 'VIEWER' | null;
+export type Role = 'MASTER' | null;
 
 export interface Product {
   id: string;
@@ -36,8 +36,9 @@ export interface AppState {
   products: Product[];
   categories?: string[];
   events?: EventType[];
-  activeLogs: DailyLog[]; // Array mapping dates to their active logs (PENDING_PEDIDO, OPEN, CLOSED)
-  historicalLogs: DailyLog[]; // Approved/Past logs for master dashboard
+  activeLogs: DailyLog[]; // Pedidos not yet closed (OPEN, plus legacy PENDING_PEDIDO/CLOSED/REJECTED)
+  historicalLogs: DailyLog[]; // Closed pedidos (APPROVED) — the financial history
+  dbUnreachable?: boolean; // true while the last data refresh failed (network / Supabase down)
 }
 
 export type BackupTrigger =

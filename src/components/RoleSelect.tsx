@@ -27,13 +27,7 @@ export const RoleSelect: React.FC = () => {
         setTimeout(() => {
             if (user === 'admin' && pass === 'master') {
                 setRole('MASTER');
-                addToast('Bienvenido, Master', 'success');
-            } else if (user === 'cocina' && pass === '1234') {
-                setRole('EMPLOYEE');
-                addToast('Bienvenido al servicio de cocina', 'success');
-            } else if (user === 'saul' && pass === 'GrupoDuke2026') {
-                setRole('VIEWER');
-                addToast('Bienvenido, Saúl', 'success');
+                addToast('Bienvenido, Admin', 'success');
             } else {
                 addToast('Credenciales incorrectas', 'error');
                 setIsLoading(false);
@@ -86,16 +80,16 @@ export const RoleSelect: React.FC = () => {
                     <h1 className="text-5xl font-black leading-[1.05] mb-6 tracking-tight">
                         Control total de tu
                         <span className="block bg-gradient-to-r from-accent-blue via-indigo-400 to-accent-green bg-clip-text text-transparent">
-                            inventario y ventas
+                            stock y tus pedidos
                         </span>
                     </h1>
                     <p className="text-base text-text-muted leading-relaxed max-w-md">
-                        Gestión profesional de stock, pedidos diarios, analíticas de pérdidas y punto de venta — todo en tiempo real desde cualquier dispositivo.
+                        Gestión de stock, pedidos por feria y control financiero — todo en tiempo real desde cualquier dispositivo.
                     </p>
 
                     {/* Feature pills */}
                     <div className="mt-8 flex flex-wrap gap-2">
-                        {['Inventario', 'Pedidos', 'Analíticas', 'POS', 'Pérdidas'].map(f => (
+                        {['Inventario', 'Pedidos', 'Calendario', 'Financiero'].map(f => (
                             <span key={f} className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-text-secondary backdrop-blur-sm">
                                 {f}
                             </span>
@@ -143,7 +137,7 @@ export const RoleSelect: React.FC = () => {
                             <label>Usuario</label>
                             <input
                                 type="text"
-                                placeholder="admin, cocina..."
+                                placeholder="admin"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 autoComplete="username"

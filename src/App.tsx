@@ -3,11 +3,13 @@ import { useAppContext } from './context/AppContext';
 import { RoleSelect } from './components/RoleSelect';
 import { Layout } from './components/Layout';
 
-// Lazy loaded pages to optimize bundle size and improve LCP/FCP
-const EmployeeDashboard = lazy(() => import('./pages/employee/EmployeeDashboard').then(m => ({ default: m.EmployeeDashboard })));
-const UsageReport = lazy(() => import('./pages/employee/UsageReport').then(m => ({ default: m.UsageReport })));
-const MasterDashboard = lazy(() => import('./pages/master/MasterDashboard').then(m => ({ default: m.MasterDashboard })));
-const SaulDashboard = lazy(() => import('./pages/viewer/SaulDashboard').then(m => ({ default: m.SaulDashboard })));
+export type MainTab = 'PANEL' | 'PEDIDOS' | 'CALENDAR' | 'CATALOG';
+
+// Lazy loaded pages to keep the initial bundle small
+const Dashboard = lazy(() => import('./pages/master/Dashboard').then(m => ({ default: m.Dashboard })));
+const Pedidos = lazy(() => import('./pages/master/Pedidos').then(m => ({ default: m.Pedidos })));
+const FeriaCalendar = lazy(() => import('./pages/master/FeriaCalendar').then(m => ({ default: m.FeriaCalendar })));
+const ProductCatalog = lazy(() => import('./pages/master/ProductCatalog').then(m => ({ default: m.ProductCatalog })));
 
 const FallbackLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-bg-primary">
@@ -17,32 +19,19 @@ const FallbackLoader = () => (
 
 const App: React.FC = () => {
   const { role } = useAppContext();
-  const [masterTab, setMasterTab] = useState<'PANEL' | 'AUDIT' | 'CATALOG' | 'ANALYTICS' | 'CALENDAR' | 'POS' | 'CREATE' | 'BACKUPS'>('PANEL');
-  const [employeeTab, setEmployeeTab] = useState<'PEDIDO' | 'REPORTES'>('PEDIDO');
+  const [tab, setTab] = useState<MainTab>('PANEL');
 
   if (!role) {
     return <RoleSelect />;
   }
 
-  if (role === 'VIEWER') {
-    return (
-      <Suspense fallback={<FallbackLoader />}>
-        <SaulDashboard />
-      </Suspense>
-    );
-  }
-
   return (
-    <Layout
-      activeTab={role === 'MASTER' ? masterTab : employeeTab}
-      onTabChange={(tab: any) => role === 'MASTER' ? setMasterTab(tab) : setEmployeeTab(tab)}
-    >
+    <Layout activeTab={tab} onTabChange={setTab}>
       <Suspense fallback={<FallbackLoader />}>
-        {role === 'EMPLOYEE' ? (
-          employeeTab === 'REPORTES' ? <UsageReport /> : <EmployeeDashboard />
-        ) : (
-          <MasterDashboard activeTab={masterTab} onTabChange={setMasterTab} />
-        )}
+        {tab === 'PANEL' && <Dashboard onGoToPedidos={() => setTab('PEDIDOS')} />}
+        {tab === 'PEDIDOS' && <Pedidos />}
+        {tab === 'CALENDAR' && <FeriaCalendar />}
+        {tab === 'CATALOG' && <ProductCatalog />}
       </Suspense>
     </Layout>
   );
