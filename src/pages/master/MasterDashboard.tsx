@@ -449,7 +449,7 @@ export const MasterDashboard: React.FC<{
                         <div>
                             <div className="section-label mb-2">Operación diaria</div>
                             <h1 className="page-title">Gestión Diaria</h1>
-                            <p className="page-subtitle">Crear pedidos nuevos, registrar sobrantes de pedidos en curso y gestionar casetas. La factura se imprime automáticamente al enviar.</p>
+                            <p className="page-subtitle">Crear pedidos nuevos, registrar sobrantes de pedidos en curso y gestionar casetas. El pedido se puede descargar o imprimir desde Pedidos Diarios.</p>
                         </div>
                     </div>
                     <EmployeeDashboard />

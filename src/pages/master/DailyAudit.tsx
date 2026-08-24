@@ -4,17 +4,17 @@ import { useToast } from '../../context/ToastContext';
 import { DailyLog } from '../../types';
 
 
-import { printRawOrder } from '../../lib/printUtils';
+import { printRawOrder, downloadRawOrder } from '../../lib/printUtils';
 import {
     AlertTriangle,
     CheckCircle2,
     ClipboardCheck,
     ClipboardList,
     Copy,
+    Download,
     Inbox,
     Link2,
     Loader2,
-    Mail,
     Minus,
     Pencil,
     Plus,
@@ -32,19 +32,6 @@ import {
 export const DailyAudit: React.FC = () => {
     const { activeLogs, products, events = [], approveDailyLog, approvePedido, rejectPedido, deleteDailyLog, updatePedidoItems, repairPendingStock, duplicateDailyLog, assignExtraToFeria } = useAppContext();
     const { addToast } = useToast();
-    const [sendingEmail, setSendingEmail] = useState<string | null>(null);
-
-    const handleEmail = async (fn: () => Promise<void>, key: string) => {
-        setSendingEmail(key);
-        try {
-            await fn();
-            addToast('PDF enviado a la impresora correctamente', 'success');
-        } catch (e: any) {
-            addToast('Error al enviar: ' + (e.message || 'inténtalo de nuevo'), 'error');
-        } finally {
-            setSendingEmail(null);
-        }
-    };
 
     // The Master needs to audit things that are PENDING_PEDIDO, OPEN or CLOSED
     const logsToAudit = activeLogs.filter(log => log.status === 'PENDING_PEDIDO' || log.status === 'OPEN' || log.status === 'CLOSED');
@@ -170,6 +157,83 @@ export const DailyAudit: React.FC = () => {
 
     const hasPending = logsToAudit.some(l => l.status === 'PENDING_PEDIDO');
 
+    // Bloque "Asociar a feria/caseta": disponible para pedidos Extra sueltos y
+    // también para Pedidos Generales sin título — si un pedido se creó sin
+    // caseta, los cierres de feria y el análisis financiero no lo encuentran,
+    // y esta es la vía para recolocarlo.
+    const renderAssignToFeria = (log: DailyLog) => {
+        const isUntitled = !log.eventTitle;
+        const isExtra = !!log.eventTitle && /extra/i.test(log.eventTitle);
+        const isAlreadyInCaseta = !!log.eventTitle && / - Caseta: .+ \(Extra \d+\)$/.test(log.eventTitle);
+        if (!isUntitled && (!isExtra || isAlreadyInCaseta)) return null;
+        const selectedFeria = extraFeriaSelection[log.id] || '';
+        const selectedCaseta = extraCasetaSelection[log.id] || '';
+        const isAssigning = assigningExtraId === log.id;
+        const casetasForSelected = selectedFeria ? (casetasByFeria[selectedFeria] || []) : [];
+        return (
+            <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-4 mb-4 animate-fade-in">
+                <div className="flex items-center gap-3 mb-3">
+                    <span className="icon-chip icon-chip-blue"><Tent size={18} strokeWidth={2.2} /></span>
+                    <div>
+                        <p className="font-bold text-accent-blue text-sm mb-0">Asociar {isUntitled ? 'este Pedido General' : 'Pedido Extra'} a una feria / caseta</p>
+                        <p className="text-[11px] text-text-muted mb-0">{isUntitled
+                            ? 'Este pedido no tiene feria asignada: no entra en el Cierre Total ni en la factura del evento hasta que lo asocies.'
+                            : 'Sumará al total e integrará en la factura final del evento.'}</p>
+                    </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 mb-2">
+                    <select
+                        value={selectedFeria}
+                        onChange={e => {
+                            const v = e.target.value;
+                            setExtraFeriaSelection(s => ({ ...s, [log.id]: v }));
+                            setExtraCasetaSelection(s => { const n = { ...s }; delete n[log.id]; return n; });
+                        }}
+                        disabled={isAssigning}
+                        className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm disabled:opacity-50"
+                    >
+                        <option value="">-- Selecciona feria --</option>
+                        {uniqueFeriaNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={selectedCaseta}
+                        onChange={e => setExtraCasetaSelection(s => ({ ...s, [log.id]: e.target.value }))}
+                        disabled={isAssigning || !selectedFeria}
+                        className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm disabled:opacity-50"
+                    >
+                        <option value="">{selectedFeria ? '-- Sin caseta concreta --' : 'Primero elige feria'}</option>
+                        {casetasForSelected.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                        ))}
+                    </select>
+                </div>
+                <button
+                    disabled={!selectedFeria || isAssigning}
+                    onClick={async () => {
+                        setAssigningExtraId(log.id);
+                        try {
+                            await assignExtraToFeria(log.id, selectedFeria, selectedCaseta || undefined);
+                            const where = selectedCaseta ? `${selectedFeria} / ${selectedCaseta}` : selectedFeria;
+                            addToast(`Pedido asociado a "${where}"`, 'success');
+                            setExtraFeriaSelection(s => { const n = { ...s }; delete n[log.id]; return n; });
+                            setExtraCasetaSelection(s => { const n = { ...s }; delete n[log.id]; return n; });
+                        } catch (err: any) {
+                            addToast('Error al asociar: ' + (err.message || 'inténtalo de nuevo'), 'error');
+                        } finally {
+                            setAssigningExtraId(null);
+                        }
+                    }}
+                    className="btn btn-outline border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 disabled:opacity-50 text-xs px-4 w-full"
+                >
+                    {isAssigning ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} strokeWidth={2.2} />}
+                    {isAssigning ? 'Asociando...' : selectedCaseta ? `Asociar a ${selectedFeria} / ${selectedCaseta}` : selectedFeria ? `Asociar a ${selectedFeria}` : 'Asociar'}
+                </button>
+            </div>
+        );
+    };
+
     return (
         <>
         <div className="page-header animate-fade-in">
@@ -216,17 +280,17 @@ export const DailyAudit: React.FC = () => {
                                         <>
                                             <button
                                                 className="btn btn-outline btn-sm border-accent-green/30 text-accent-green hover:bg-accent-green/10"
-                                                onClick={() => printRawOrder(log)}
+                                                onClick={() => { downloadRawOrder(log); addToast('Pedido descargado', 'success'); }}
+                                                title="Descargar el pedido como archivo, sin imprimir"
                                             >
-                                                <Printer size={14} strokeWidth={2.2} /> Imprimir Pedido
+                                                <Download size={14} strokeWidth={2.2} /> Descargar Pedido
                                             </button>
                                             <button
-                                                disabled={!!sendingEmail}
-                                                className="btn btn-outline btn-sm border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
-                                                onClick={() => handleEmail(() => printRawOrder(log, true), log.id)}
+                                                className="btn btn-outline btn-sm border-white/20 text-text-muted hover:bg-white/10"
+                                                onClick={() => printRawOrder(log)}
+                                                title="Abrir el diálogo de impresión del navegador"
                                             >
-                                                {sendingEmail === log.id ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} strokeWidth={2.2} />}
-                                                {sendingEmail === log.id ? 'Enviando...' : 'Email'}
+                                                <Printer size={14} strokeWidth={2.2} /> Imprimir
                                             </button>
                                         </>
                                     )}
@@ -340,6 +404,8 @@ export const DailyAudit: React.FC = () => {
                                 )}
                             </div>
 
+                            {!isEditing && !isPending && renderAssignToFeria(log)}
+
                             {!isEditing && isPending && (
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6">
                                     <button
@@ -440,75 +506,7 @@ export const DailyAudit: React.FC = () => {
                                 </div>
                             </div>
 
-                            {(() => {
-                                const isExtra = !!log.eventTitle && /extra/i.test(log.eventTitle);
-                                const isAlreadyInCaseta = !!log.eventTitle && / - Caseta: .+ \(Extra \d+\)$/.test(log.eventTitle);
-                                if (!isExtra || isAlreadyInCaseta) return null;
-                                const selectedFeria = extraFeriaSelection[log.id] || '';
-                                const selectedCaseta = extraCasetaSelection[log.id] || '';
-                                const isAssigning = assigningExtraId === log.id;
-                                const casetasForSelected = selectedFeria ? (casetasByFeria[selectedFeria] || []) : [];
-                                return (
-                                    <div className="bg-accent-blue/5 border border-accent-blue/20 rounded-xl p-4 mb-4 animate-fade-in">
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <span className="icon-chip icon-chip-blue"><Tent size={18} strokeWidth={2.2} /></span>
-                                            <div>
-                                                <p className="font-bold text-accent-blue text-sm mb-0">Asociar Pedido Extra a una feria / caseta</p>
-                                                <p className="text-[11px] text-text-muted mb-0">Sumará al total e integrará en la factura final del evento.</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col sm:flex-row gap-2 mb-2">
-                                            <select
-                                                value={selectedFeria}
-                                                onChange={e => {
-                                                    const v = e.target.value;
-                                                    setExtraFeriaSelection(s => ({ ...s, [log.id]: v }));
-                                                    setExtraCasetaSelection(s => { const n = { ...s }; delete n[log.id]; return n; });
-                                                }}
-                                                disabled={isAssigning}
-                                                className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm disabled:opacity-50"
-                                            >
-                                                <option value="">-- Selecciona feria --</option>
-                                                {uniqueFeriaNames.map(name => (
-                                                    <option key={name} value={name}>{name}</option>
-                                                ))}
-                                            </select>
-                                            <select
-                                                value={selectedCaseta}
-                                                onChange={e => setExtraCasetaSelection(s => ({ ...s, [log.id]: e.target.value }))}
-                                                disabled={isAssigning || !selectedFeria}
-                                                className="flex-1 bg-bg-primary/50 border border-white/20 rounded-lg p-2 text-white outline-none focus:border-accent-blue text-sm disabled:opacity-50"
-                                            >
-                                                <option value="">{selectedFeria ? '-- Sin caseta concreta --' : 'Primero elige feria'}</option>
-                                                {casetasForSelected.map(name => (
-                                                    <option key={name} value={name}>{name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <button
-                                            disabled={!selectedFeria || isAssigning}
-                                            onClick={async () => {
-                                                setAssigningExtraId(log.id);
-                                                try {
-                                                    await assignExtraToFeria(log.id, selectedFeria, selectedCaseta || undefined);
-                                                    const where = selectedCaseta ? `${selectedFeria} / ${selectedCaseta}` : selectedFeria;
-                                                    addToast(`Extra asociado a "${where}"`, 'success');
-                                                    setExtraFeriaSelection(s => { const n = { ...s }; delete n[log.id]; return n; });
-                                                    setExtraCasetaSelection(s => { const n = { ...s }; delete n[log.id]; return n; });
-                                                } catch (err: any) {
-                                                    addToast('Error al asociar: ' + (err.message || 'inténtalo de nuevo'), 'error');
-                                                } finally {
-                                                    setAssigningExtraId(null);
-                                                }
-                                            }}
-                                            className="btn btn-outline border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 disabled:opacity-50 text-xs px-4 w-full"
-                                        >
-                                            {isAssigning ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} strokeWidth={2.2} />}
-                                            {isAssigning ? 'Asociando...' : selectedCaseta ? `Asociar a ${selectedFeria} / ${selectedCaseta}` : selectedFeria ? `Asociar a ${selectedFeria}` : 'Asociar'}
-                                        </button>
-                                    </div>
-                                );
-                            })()}
+                            {renderAssignToFeria(log)}
 
                             <button
                                 className="btn btn-success w-full text-lg py-4"

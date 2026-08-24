@@ -5,6 +5,7 @@ import {
     ChevronDown,
     ChevronRight,
     Info,
+    Link2,
     Loader2,
     Mail,
     Pencil,
@@ -261,7 +262,7 @@ type EditRow = { product: Product; prepared: number; consumed: number };
 const stripExtraSuffix = (title: string) => title.replace(/\s*\(Extra\s+\d+\)\s*$/i, '');
 
 export const FinancialFeriaReport: React.FC = () => {
-    const { historicalLogs, products, categories, editHistoricalLog, editOrderTotal, addProduct } = useAppContext();
+    const { historicalLogs, products, categories, events = [], editHistoricalLog, editOrderTotal, addProduct, assignExtraToFeria } = useAppContext();
     const { addToast } = useToast();
     const [selectedOrderId, setSelectedOrderId] = useState<string>('');
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -280,6 +281,53 @@ export const FinancialFeriaReport: React.FC = () => {
     const [newProdPrice, setNewProdPrice] = useState('');
     const [newProdCategory, setNewProdCategory] = useState('General');
     const [catalogSearch, setCatalogSearch] = useState('');
+    // Reasignar un día del "Pedido General" (pedidos aprobados sin feria) a una feria/caseta
+    const [assignModal, setAssignModal] = useState<{ date: string; logIds: string[] } | null>(null);
+    const [assignFeria, setAssignFeria] = useState('');
+    const [assignCaseta, setAssignCaseta] = useState('');
+    const [isAssigning, setIsAssigning] = useState(false);
+
+    const uniqueFeriaNames = useMemo(() => {
+        const names = new Set<string>();
+        events.filter(e => e.type === 'EVENT').forEach(e => names.add(e.title));
+        return Array.from(names).sort((a, b) => a.localeCompare(b, 'es'));
+    }, [events]);
+
+    const casetasByFeria = useMemo(() => {
+        const map: Record<string, Set<string>> = {};
+        events.filter(e => e.type === 'ORDER').forEach(e => {
+            let body = e.title.startsWith('Pedido ') ? e.title.substring(7) : e.title;
+            if (body.includes(' - Caseta: ')) {
+                const [feriaPart, casetaPart] = body.split(' - Caseta: ');
+                if (!map[feriaPart]) map[feriaPart] = new Set();
+                map[feriaPart].add(casetaPart);
+            }
+        });
+        const out: Record<string, string[]> = {};
+        for (const [feria, set] of Object.entries(map)) {
+            out[feria] = Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+        }
+        return out;
+    }, [events]);
+
+    const handleAssignDay = async () => {
+        if (!assignModal || !assignFeria) return;
+        setIsAssigning(true);
+        try {
+            for (const lid of assignModal.logIds) {
+                await assignExtraToFeria(lid, assignFeria, assignCaseta || undefined);
+            }
+            const where = assignCaseta ? `${assignFeria} / ${assignCaseta}` : assignFeria;
+            addToast(`Pedido del ${assignModal.date} asociado a "${where}"`, 'success');
+            setAssignModal(null);
+            setAssignFeria('');
+            setAssignCaseta('');
+        } catch (e: any) {
+            addToast('Error al asociar: ' + (e.message || 'inténtalo de nuevo'), 'error');
+        } finally {
+            setIsAssigning(false);
+        }
+    };
 
     const allCategoryOptions = useMemo(() => {
         const fromCatalog = categories || [];
@@ -790,6 +838,22 @@ export const FinancialFeriaReport: React.FC = () => {
                                                                         ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Enviando...</>
                                                                         : <><Mail size={14} strokeWidth={2.2} aria-hidden="true" /> Email</>}
                                                                 </button>
+                                                                {(() => {
+                                                                    const untitledIds = day.logIds.filter((lid: string) => {
+                                                                        const log = historicalLogs.find(l => l.id === lid);
+                                                                        return log && !log.eventTitle;
+                                                                    });
+                                                                    if (untitledIds.length === 0) return null;
+                                                                    return (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setAssignFeria(''); setAssignCaseta(''); setAssignModal({ date: day.date, logIds: untitledIds }); }}
+                                                                            className="btn btn-sm btn-outline border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 font-bold"
+                                                                            title="Mover este pedido a una feria / caseta para que aparezca en su factura"
+                                                                        >
+                                                                            <Link2 size={14} strokeWidth={2.2} aria-hidden="true" /> Asociar
+                                                                        </button>
+                                                                    );
+                                                                })()}
                                                                 {day.logIds.length === 1 ? (
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); openEditor(day.logIds[0], day.date, selectedOrder.title); }}
@@ -880,6 +944,60 @@ export const FinancialFeriaReport: React.FC = () => {
                 </div>
             )}
         </div>
+
+        {/* ─── Asociar día a feria Modal ─── */}
+        {assignModal && (
+            <div className="modal-overlay">
+                <div className="modal-panel max-w-md flex flex-col gap-4">
+                    <h3 className="text-xl font-bold mb-0 flex items-center gap-3">
+                        <span className="icon-chip icon-chip-blue"><Link2 size={18} strokeWidth={2.2} /></span>
+                        Asociar a Feria / Caseta
+                    </h3>
+                    <p className="text-text-muted text-sm mb-0">
+                        El pedido del <strong className="text-white">{assignModal.date}</strong> se creó sin feria. Al asociarlo, sus productos aparecerán en la factura y totales de la caseta elegida.
+                    </p>
+                    <select
+                        value={assignFeria}
+                        onChange={e => { setAssignFeria(e.target.value); setAssignCaseta(''); }}
+                        disabled={isAssigning}
+                        className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-accent-blue text-sm disabled:opacity-50"
+                    >
+                        <option value="">-- Selecciona feria --</option>
+                        {uniqueFeriaNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={assignCaseta}
+                        onChange={e => setAssignCaseta(e.target.value)}
+                        disabled={isAssigning || !assignFeria}
+                        className="w-full bg-bg-primary/50 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-accent-blue text-sm disabled:opacity-50"
+                    >
+                        <option value="">{assignFeria ? '-- Sin caseta concreta --' : 'Primero elige feria'}</option>
+                        {(assignFeria ? (casetasByFeria[assignFeria] || []) : []).map(name => (
+                            <option key={name} value={name}>{name}</option>
+                        ))}
+                    </select>
+                    <div className="flex gap-3">
+                        <button
+                            className="btn btn-outline flex-1"
+                            onClick={() => setAssignModal(null)}
+                            disabled={isAssigning}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn btn-primary flex-1 disabled:opacity-50"
+                            disabled={!assignFeria || isAssigning}
+                            onClick={handleAssignDay}
+                        >
+                            {isAssigning ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} strokeWidth={2.2} />}
+                            {isAssigning ? 'Asociando...' : 'Asociar'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* ─── Edit TOTAL Modal ─── */}
         {editingTotal && (

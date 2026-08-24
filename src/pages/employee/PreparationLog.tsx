@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { InventoryItem } from '../../types';
-import { printRawOrder } from '../../lib/printUtils';
 import { Utensils, Search, X, Loader2, Minus, Plus, Send, AlertTriangle, XCircle, Ban, PackageOpen } from 'lucide-react';
 
 export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: string, onLogCreated?: () => void }> = ({ selectedDate, eventTitle, onLogCreated }) => {
@@ -43,19 +42,8 @@ export const PreparationLog: React.FC<{ selectedDate: string, eventTitle?: strin
         setIsSaving(true);
         try {
             await openDailyLog(selectedDate, items, eventTitle);
-            
-            // Generate the invoice of the gross order
-            const mockLog = { date: selectedDate, eventTitle, items };
-            
-            // 1. Send via Email (which sends to the Brother Printer)
-            try {
-                await printRawOrder(mockLog, true);
-            } catch (printErr: any) {
-                console.error("Error enviando factura por email:", printErr);
-                addToast("Hubo un error enviando la factura por email.", "error");
-            }
 
-            addToast(`✅ Pedido del ${selectedDate} guardado e impreso. Lo encontrarás en "Pedidos Diarios" (badge rojo en la barra lateral).`, 'success');
+            addToast(`✅ Pedido del ${selectedDate} guardado. Lo encontrarás en "Pedidos Diarios" (badge rojo en la barra lateral).`, 'success');
             if (onLogCreated) onLogCreated();
         } catch (error) {
             console.error("Error creating log:", error);

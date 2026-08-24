@@ -29,7 +29,7 @@ export const ORDER_PRINT_STYLES = `
   @media print { body { padding: 16px; } @page { margin: 10mm; } }
 `;
 
-const buildOrderHtml = (log: { date: string; eventTitle?: string; items: any[] }): string => {
+const buildOrderHtml = (log: { date: string; eventTitle?: string; items: any[] }, autoPrint = true): string => {
     const byCategory: Record<string, typeof log.items> = {};
     log.items.filter(i => i.prepared > 0).forEach(item => {
         const cat = item.product.category || 'Sin categoría';
@@ -78,7 +78,7 @@ const buildOrderHtml = (log: { date: string; eventTitle?: string; items: any[] }
   </div>
   ${sections}
   <div class="footer">Generado el ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-  <script>window.onload = function() { window.print(); }<\/script>
+  ${autoPrint ? '<script>window.onload = function() { window.print(); }<\/script>' : ''}
 </body></html>`;
 };
 
@@ -98,4 +98,21 @@ export const printRawOrder = (log: { date: string; eventTitle?: string; items: a
     const blob = new Blob([html], { type: 'text/html' });
     window.open(URL.createObjectURL(blob), '_blank');
     return Promise.resolve();
+};
+
+/**
+ * Descarga el pedido como archivo HTML, sin abrir ningún diálogo de impresión.
+ * El admin puede abrir el archivo y imprimirlo él mismo cuando quiera.
+ */
+export const downloadRawOrder = (log: { date: string; eventTitle?: string; items: any[] }): void => {
+    const html = buildOrderHtml(log, false);
+    const safeTitle = (log.eventTitle || 'Pedido').replace(/[^\w\s-]/g, '_').slice(0, 60);
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Pedido-${safeTitle}-${log.date}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 };

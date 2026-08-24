@@ -69,6 +69,8 @@ export const EmployeeDashboard: React.FC = () => {
     const [showTotalReturn, setShowTotalReturn] = useState<string | null>(null);
     // Modal for selecting which caseta the extra order belongs to
     const [showExtraModal, setShowExtraModal] = useState(false);
+    // Modal to choose caseta (or general) when creating a pedido on a day with casetas programadas
+    const [showNewPedidoModal, setShowNewPedidoModal] = useState(false);
 
     // Reset selection when date changes
     useEffect(() => {
@@ -78,6 +80,7 @@ export const EmployeeDashboard: React.FC = () => {
         setSelectedLogForSobrantes(null);
         setShowTotalReturn(null);
         setShowExtraModal(false);
+        setShowNewPedidoModal(false);
     }, [selectedDate]);
 
     const allLogs = [...activeLogs, ...historicalLogs];
@@ -699,7 +702,13 @@ export const EmployeeDashboard: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                         <button
                             className="btn btn-primary py-4 text-base w-full"
-                            onClick={() => setSelectedEventTitleForNew('')}
+                            onClick={() => {
+                                // En días con casetas programadas, preguntar a cuál pertenece el
+                                // pedido: un pedido sin caseta no entra en el Cierre Total de la
+                                // feria ni en su factura, y se queda huérfano.
+                                if (availableProgrammedOrders.length > 0) setShowNewPedidoModal(true);
+                                else setSelectedEventTitleForNew('');
+                            }}
                         >
                             <ClipboardList size={18} strokeWidth={2.2} /> Realizar Pedido
                         </button>
@@ -714,6 +723,95 @@ export const EmployeeDashboard: React.FC = () => {
             </div>
         );
 
+    };
+
+    // --- CASETA SELECTION MODAL FOR A NEW (NON-EXTRA) ORDER ---
+    // Days that belong to a feria have casetas programadas; a pedido created
+    // without its caseta title never enters the feria's Cierre Total nor its
+    // invoice, so we ask before creating a "Pedido General" on those days.
+    const renderNewPedidoModal = () => {
+        if (!showNewPedidoModal) return null;
+
+        const groupedProgrammed = availableProgrammedOrders.reduce((acc, po) => {
+            let group = "Generales";
+            let display = po.title;
+            if (po.title.startsWith('Pedido ')) {
+                const text = po.title.substring(7);
+                if (text.includes(' - Caseta: ')) {
+                    const parts = text.split(' - Caseta: ');
+                    group = parts[0];
+                    display = parts[1];
+                } else {
+                    group = text;
+                    display = 'Caseta Principal';
+                }
+            } else if (po.title.includes(' - Caseta: ')) {
+                const parts = po.title.split(' - Caseta: ');
+                group = parts[0];
+                display = parts[1];
+            }
+            if (!acc[group]) acc[group] = [];
+            acc[group].push({ fullTitle: po.title, displayName: display });
+            return acc;
+        }, {} as Record<string, { fullTitle: string, displayName: string }[]>);
+
+        return (
+            <div className="modal-overlay" onClick={() => setShowNewPedidoModal(false)}>
+                <div
+                    className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-bg-primary border border-white/10 rounded-2xl shadow-2xl shadow-black/60"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="p-6 border-b border-white/10">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <span className="icon-chip icon-chip-blue"><ClipboardList size={18} strokeWidth={2.2} /></span>
+                                <div>
+                                    <h2 className="text-xl font-bold">Nuevo Pedido</h2>
+                                    <p className="text-text-muted text-sm mt-0.5">¿Para qué caseta es este pedido?</p>
+                                </div>
+                            </div>
+                            <button
+                                aria-label="Cerrar"
+                                className="text-text-muted hover:text-white transition-colors p-1 shrink-0"
+                                onClick={() => setShowNewPedidoModal(false)}
+                            ><X size={18} strokeWidth={2.4} /></button>
+                        </div>
+                    </div>
+
+                    <div className="p-4 flex flex-col gap-4 max-h-72 overflow-y-auto w-full">
+                        {Object.entries(groupedProgrammed).map(([groupName, casetasEnGrupo]) => (
+                            <div key={groupName} className="flex flex-col gap-2">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-accent-blue/80 px-1">{groupName}</h4>
+                                {casetasEnGrupo.map(c => (
+                                    <button
+                                        key={c.fullTitle}
+                                        className="w-full text-left p-3 rounded-xl border border-white/10 bg-bg-elevated/40 hover:bg-accent-blue/10 hover:border-accent-blue/40 transition-all flex items-center justify-between group"
+                                        onClick={() => { setShowNewPedidoModal(false); setSelectedEventTitleForNew(c.fullTitle); }}
+                                    >
+                                        <div className="font-semibold text-white group-hover:text-accent-blue transition-colors truncate min-w-0 pr-2">{c.displayName}</div>
+                                        <span className="text-accent-blue text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap inline-flex items-center gap-1">Seleccionar <ChevronRight size={14} strokeWidth={2.4} /></span>
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="px-4 pb-4">
+                        <div className="flex items-center gap-3 my-2">
+                            <div className="flex-1 h-px bg-white/10" />
+                            <span className="text-xs text-text-muted uppercase tracking-wider">o bien</span>
+                            <div className="flex-1 h-px bg-white/10" />
+                        </div>
+                        <button
+                            className="w-full p-3 rounded-xl border border-dashed border-white/20 hover:border-white/40 text-text-muted hover:text-white transition-all text-sm inline-flex items-center justify-center gap-2"
+                            onClick={() => { setShowNewPedidoModal(false); setSelectedEventTitleForNew(''); }}
+                        >
+                            <Package size={16} strokeWidth={2.2} className="shrink-0" /> Pedido General (sin caseta)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     // --- CASETA SELECTION MODAL FOR EXTRA ORDER ---
@@ -862,6 +960,7 @@ export const EmployeeDashboard: React.FC = () => {
                 onMonthChange={setCurrentMonth}
             />
             {renderPedidoContent()}
+            {renderNewPedidoModal()}
             {renderExtraModal()}
         </div>
     );
