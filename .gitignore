@@ -38,3 +38,6 @@ push-test-output.txt
 scripts/restore-data.json
 scripts/pre-restore-*.json
 scripts/backup-*.json
+
+# Playwright MCP artefactos de prueba
+.playwright-mcp/

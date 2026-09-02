@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import type { DailyLog } from '../../types';
 import { fetchAll } from '../../lib/supabaseClient';
+import { downloadSeasonExcel, feriaOf } from '../../lib/exportSeason';
 import {
     BarChart3,
     CalendarDays,
@@ -19,12 +20,17 @@ import {
     Trash2,
     Download,
     Loader2,
+    FileSpreadsheet,
 } from 'lucide-react';
 
 export const Dashboard: React.FC<{ onGoToPedidos: () => void }> = ({ onGoToPedidos }) => {
-    const { historicalLogs, activeLogs, deleteDailyLog } = useAppContext();
+    const { historicalLogs, activeLogs, products, deleteDailyLog } = useAppContext();
     const { addToast } = useToast();
     const [isBackingUp, setIsBackingUp] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportFrom, setExportFrom] = useState('');
+    const [exportTo, setExportTo] = useState('');
+    const [exportFeria, setExportFeria] = useState('');
     const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
 
     // deleteDailyLog refunds stock itself: for an OPEN pedido it adds back every
@@ -50,6 +56,51 @@ export const Dashboard: React.FC<{ onGoToPedidos: () => void }> = ({ onGoToPedid
             addToast('Error al borrar el pedido', 'error');
         } finally {
             setDeletingLogId(null);
+        }
+    };
+
+    // Ferias que aparecen en pedidos ya cerrados: son las unicas exportables.
+    const feriasDisponibles = React.useMemo(() => {
+        const set = new Set<string>();
+        historicalLogs.forEach(l => set.add(feriaOf(l.eventTitle)));
+        return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+    }, [historicalLogs]);
+
+    // Rango completo de la temporada, para los placeholders de las fechas.
+    const rangoTemporada = React.useMemo(() => {
+        if (historicalLogs.length === 0) return null;
+        const dates = historicalLogs.map(l => l.date).sort();
+        return { first: dates[0], last: dates[dates.length - 1] };
+    }, [historicalLogs]);
+
+    const handleExportSeason = async () => {
+        if (isExporting) return;
+        if (historicalLogs.length === 0) {
+            addToast('Todavia no hay pedidos cerrados que exportar.', 'error');
+            return;
+        }
+        if (exportFrom && exportTo && exportFrom > exportTo) {
+            addToast('La fecha "Desde" no puede ser posterior a "Hasta".', 'error');
+            return;
+        }
+        setIsExporting(true);
+        try {
+            const { pedidos, productos } = await downloadSeasonExcel(
+                historicalLogs,
+                activeLogs,
+                products,
+                { from: exportFrom || undefined, to: exportTo || undefined, feria: exportFeria || undefined }
+            );
+            if (pedidos === 0) {
+                addToast('No hay pedidos cerrados en ese periodo. Revisa las fechas o la feria.', 'error');
+            } else {
+                addToast(`Excel descargado: ${pedidos} pedidos y ${productos} productos.`, 'success');
+            }
+        } catch (e: any) {
+            console.error('Error exportando la temporada:', e);
+            addToast('Error al generar el Excel: ' + (e?.message || 'intentalo de nuevo'), 'error');
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -297,6 +348,80 @@ export const Dashboard: React.FC<{ onGoToPedidos: () => void }> = ({ onGoToPedid
                     </div>
 
                     <FinancialFeriaReport />
+
+                    {/* ─── Informe de temporada (Excel) ─── */}
+                    <div className="card mt-6">
+                        <div className="flex items-start gap-3 mb-5">
+                            <div className="icon-chip icon-chip-green shrink-0">
+                                <FileSpreadsheet size={18} strokeWidth={2.2} />
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="font-bold leading-tight mb-1">Informe de Temporada (Excel)</h4>
+                                <p className="text-sm text-text-muted mb-0">
+                                    Todo el movimiento de almacen: lo enviado, lo consumido y lo sobrante, por producto,
+                                    por feria y dia a dia. Deja las fechas en blanco para sacar la temporada completa.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                            <div className="input-group mb-0">
+                                <label htmlFor="exp-desde">Desde</label>
+                                <input
+                                    id="exp-desde"
+                                    type="date"
+                                    value={exportFrom}
+                                    max={exportTo || undefined}
+                                    onChange={e => setExportFrom(e.target.value)}
+                                />
+                            </div>
+                            <div className="input-group mb-0">
+                                <label htmlFor="exp-hasta">Hasta</label>
+                                <input
+                                    id="exp-hasta"
+                                    type="date"
+                                    value={exportTo}
+                                    min={exportFrom || undefined}
+                                    onChange={e => setExportTo(e.target.value)}
+                                />
+                            </div>
+                            <div className="input-group mb-0">
+                                <label htmlFor="exp-feria">Feria</label>
+                                <select id="exp-feria" value={exportFeria} onChange={e => setExportFeria(e.target.value)}>
+                                    <option value="">Todas las ferias</option>
+                                    {feriasDisponibles.map(f => (
+                                        <option key={f} value={f}>{f}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <p className="text-[11px] text-text-muted mb-0 leading-relaxed">
+                                {rangoTemporada
+                                    ? <>Hay datos cerrados del <strong>{rangoTemporada.first.split('-').reverse().join('/')}</strong> al <strong>{rangoTemporada.last.split('-').reverse().join('/')}</strong>. </>
+                                    : <>Aun no hay pedidos cerrados. </>}
+                                Solo se incluyen pedidos ya cerrados (con sobrantes registrados).
+                            </p>
+                            <button
+                                className="btn btn-success whitespace-nowrap w-full sm:w-auto shrink-0 disabled:opacity-50"
+                                onClick={handleExportSeason}
+                                disabled={isExporting || historicalLogs.length === 0}
+                            >
+                                {isExporting ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" />
+                                        Generando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <FileSpreadsheet size={16} strokeWidth={2.2} />
+                                        Descargar Excel
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
 
                     <div className="card mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
