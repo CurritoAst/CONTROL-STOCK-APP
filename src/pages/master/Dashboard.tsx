@@ -4,7 +4,9 @@ import { useAppContext } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import type { DailyLog } from '../../types';
 import { fetchAll } from '../../lib/supabaseClient';
-import { downloadSeasonExcel, feriaOf } from '../../lib/exportSeason';
+import { buildSeasonReport, feriaOf } from '../../lib/seasonReport';
+import { downloadSeasonExcel } from '../../lib/exportSeason';
+import { downloadSeasonPdf } from '../../lib/exportSeasonPdf';
 import {
     BarChart3,
     CalendarDays,
@@ -21,13 +23,14 @@ import {
     Download,
     Loader2,
     FileSpreadsheet,
+    FileText,
 } from 'lucide-react';
 
 export const Dashboard: React.FC<{ onGoToPedidos: () => void }> = ({ onGoToPedidos }) => {
     const { historicalLogs, activeLogs, products, deleteDailyLog } = useAppContext();
     const { addToast } = useToast();
     const [isBackingUp, setIsBackingUp] = useState(false);
-    const [isExporting, setIsExporting] = useState(false);
+    const [isExporting, setIsExporting] = useState<'xlsx' | 'pdf' | null>(null);
     const [exportFrom, setExportFrom] = useState('');
     const [exportTo, setExportTo] = useState('');
     const [exportFeria, setExportFeria] = useState('');
@@ -73,7 +76,9 @@ export const Dashboard: React.FC<{ onGoToPedidos: () => void }> = ({ onGoToPedid
         return { first: dates[0], last: dates[dates.length - 1] };
     }, [historicalLogs]);
 
-    const handleExportSeason = async () => {
+    // Excel y PDF salen del MISMO informe calculado, asi que nunca pueden
+    // discrepar en las cifras.
+    const handleExportSeason = async (format: 'xlsx' | 'pdf') => {
         if (isExporting) return;
         if (historicalLogs.length === 0) {
             addToast('Todavia no hay pedidos cerrados que exportar.', 'error');
@@ -83,24 +88,30 @@ export const Dashboard: React.FC<{ onGoToPedidos: () => void }> = ({ onGoToPedid
             addToast('La fecha "Desde" no puede ser posterior a "Hasta".', 'error');
             return;
         }
-        setIsExporting(true);
+
+        const report = buildSeasonReport(historicalLogs, activeLogs, products, {
+            from: exportFrom || undefined,
+            to: exportTo || undefined,
+            feria: exportFeria || undefined,
+        });
+        if (report.logs.length === 0) {
+            addToast('No hay pedidos cerrados en ese periodo. Revisa las fechas o la feria.', 'error');
+            return;
+        }
+
+        setIsExporting(format);
         try {
-            const { pedidos, productos } = await downloadSeasonExcel(
-                historicalLogs,
-                activeLogs,
-                products,
-                { from: exportFrom || undefined, to: exportTo || undefined, feria: exportFeria || undefined }
+            if (format === 'pdf') await downloadSeasonPdf(report);
+            else await downloadSeasonExcel(report);
+            addToast(
+                `${format === 'pdf' ? 'PDF' : 'Excel'} descargado: ${report.logs.length} pedidos y ${report.productRows.length} productos.`,
+                'success'
             );
-            if (pedidos === 0) {
-                addToast('No hay pedidos cerrados en ese periodo. Revisa las fechas o la feria.', 'error');
-            } else {
-                addToast(`Excel descargado: ${pedidos} pedidos y ${productos} productos.`, 'success');
-            }
         } catch (e: any) {
             console.error('Error exportando la temporada:', e);
-            addToast('Error al generar el Excel: ' + (e?.message || 'intentalo de nuevo'), 'error');
+            addToast('Error al generar el informe: ' + (e?.message || 'intentalo de nuevo'), 'error');
         } finally {
-            setIsExporting(false);
+            setIsExporting(null);
         }
     };
 
@@ -358,8 +369,9 @@ export const Dashboard: React.FC<{ onGoToPedidos: () => void }> = ({ onGoToPedid
                             <div className="min-w-0">
                                 <h4 className="font-bold leading-tight mb-1">Informe de Temporada (Excel)</h4>
                                 <p className="text-sm text-text-muted mb-0">
-                                    Todo el movimiento de almacen: lo enviado, lo consumido y lo sobrante, por producto,
-                                    por feria y dia a dia. Deja las fechas en blanco para sacar la temporada completa.
+                                    Todo el movimiento de almacen: lo enviado, lo consumido y lo sobrante. El <strong>PDF</strong> es
+                                    el informe presentable; el <strong>Excel</strong> lleva ademas el detalle dia a dia.
+                                    Deja las fechas en blanco para sacar la temporada completa.
                                 </p>
                             </div>
                         </div>
@@ -403,23 +415,44 @@ export const Dashboard: React.FC<{ onGoToPedidos: () => void }> = ({ onGoToPedid
                                     : <>Aun no hay pedidos cerrados. </>}
                                 Solo se incluyen pedidos ya cerrados (con sobrantes registrados).
                             </p>
-                            <button
-                                className="btn btn-success whitespace-nowrap w-full sm:w-auto shrink-0 disabled:opacity-50"
-                                onClick={handleExportSeason}
-                                disabled={isExporting || historicalLogs.length === 0}
-                            >
-                                {isExporting ? (
-                                    <>
-                                        <Loader2 size={16} className="animate-spin" />
-                                        Generando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <FileSpreadsheet size={16} strokeWidth={2.2} />
-                                        Descargar Excel
-                                    </>
-                                )}
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+                                <button
+                                    className="btn btn-outline whitespace-nowrap w-full sm:w-auto disabled:opacity-50"
+                                    onClick={() => handleExportSeason('pdf')}
+                                    disabled={!!isExporting || historicalLogs.length === 0}
+                                    title="Informe ejecutivo en PDF, listo para imprimir o enviar"
+                                >
+                                    {isExporting === 'pdf' ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            Generando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileText size={16} strokeWidth={2.2} />
+                                            Descargar PDF
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    className="btn btn-success whitespace-nowrap w-full sm:w-auto disabled:opacity-50"
+                                    onClick={() => handleExportSeason('xlsx')}
+                                    disabled={!!isExporting || historicalLogs.length === 0}
+                                    title="Hoja de calculo con todo el detalle, dia a dia"
+                                >
+                                    {isExporting === 'xlsx' ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            Generando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileSpreadsheet size={16} strokeWidth={2.2} />
+                                            Descargar Excel
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
